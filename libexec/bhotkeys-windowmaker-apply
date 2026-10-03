@@ -1,0 +1,293 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Grab listener chords in Window Maker $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Grab listener chords in Window Maker so the focused client does
+# not see them. Shortcuts live on root-menu entries that run true.
+# A shortcut the menu already names is left alone. SIGUSR1 restarts
+# Window Maker so it re-reads the menu. SIGHUP would exit it.
+# Missing wmaker is not an error.
+#
+############################################################ GLOBALS
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+bh_wm=windowmaker
+
+begin='"bhotkeys" MENU'
+end='"bhotkeys" END'
+pbegin='/* bhotkeys */'
+pend='/* /bhotkeys */'
+
+############################################################ FUNCTIONS
+
+wmaker_up()
+{
+	proc_eq wmaker
+}
+
+menu_path()
+{
+	local __dom __line __path
+
+	menu_file="$HOME/GNUstep/Defaults/WMRootMenu"
+	__dom="$HOME/GNUstep/Defaults/WindowMaker"
+	[ -f "$__dom" ] || return 0
+	__line=$( awk '
+		/RootMenu/ && /"/ {
+			if (match($0, /"[^"]+"/)) {
+				s = substr($0, RSTART + 1, RLENGTH - 2)
+				if (s ~ /^\// || s ~ /^~/) {
+					print s
+					exit
+				}
+			}
+		}
+	' "$__dom" )
+	[ "$__line" ] || return 0
+	case "$__line" in
+	~/*) __path="$HOME/${__line#~/}" ;;
+	/*) __path="$__line" ;;
+	*) return 0
+	esac
+	case "$__path" in
+	"$HOME"/*) [ -f "$__path" ] && menu_file="$__path" ;;
+	esac
+}
+
+menu_kind()
+{
+	if quietly grep -E 'MENU$' "$menu_file"; then
+		printf '%s\n' menu
+		return 0
+	fi
+	if quietly grep -E '^[[:space:]]*\(' "$menu_file"; then
+		printf '%s\n' paren
+		return 0
+	fi
+	printf '%s\n' menu
+}
+
+# Shortcuts already in the menu, outside the block this script owns
+wm_taken()
+{
+	awk '
+		function trim(s) {
+			sub(/^[ \t]+/, "", s)
+			sub(/[ \t]+$/, "", s)
+			return s
+		}
+		function take(line,   s) {
+			if (match(line, /SHORTCUT,[ \t]*"[^"]*"/) ||
+				match(line, /SHORTCUT[ \t]+"[^"]*"/)) {
+				s = substr(line, RSTART, RLENGTH)
+				sub(/^[^"]*"/, "", s)
+				sub(/"$/, "", s)
+				print s
+			}
+		}
+		{
+			t = trim($0)
+		}
+		t == "\"bhotkeys\" MENU" { skip = 1; next }
+		t == "\"bhotkeys\" END" { skip = 0; next }
+		t == "/* bhotkeys */" { skip = 1; next }
+		t == "/* /bhotkeys */" { skip = 0; next }
+		skip { next }
+		{ take($0) }
+	' "$1"
+}
+
+emit_menu()
+{
+	local __chords="$1" __taken="$2" __id __cut
+
+	printf '%s\n' "$begin"
+	while IFS='	' read -r __id __cut; do
+		[ "$__id" ] || continue
+		quietly grep -F -x "$__cut" "$__taken" &&
+			continue
+		quietly grep -F -x "$__cut" "$seen" &&
+			continue
+		printf '%s\n' "$__cut" >> "$seen"
+		printf '%s\n' \
+			"\"bhotkeys-$__id\" SHORTCUT \"$__cut\" EXEC \"/usr/bin/true\""
+	done < "$__chords"
+	printf '%s\n' "$end"
+}
+
+emit_paren()
+{
+	local __chords="$1" __taken="$2" __id __cut
+	local __line __last=
+
+	printf '%s\n' "$pbegin"
+	while IFS='	' read -r __id __cut; do
+		[ "$__id" ] || continue
+		quietly grep -F -x "$__cut" "$__taken" &&
+			continue
+		quietly grep -F -x "$__cut" "$seen" &&
+			continue
+		printf '%s\n' "$__cut" >> "$seen"
+		__line="(\"bhotkeys-$__id\", SHORTCUT, \"$__cut\", EXEC, \"/usr/bin/true\")"
+		[ "$__last" ] && printf '%s\n' "$__last,"
+		__last="$__line"
+	done < "$__chords"
+	[ "$__last" ] && printf '%s\n' "$__last"
+	printf '%s\n' "$pend"
+}
+
+# First insert of a paren block, in front of the closing paren
+insert_paren()
+{
+	local __file="$1" __body="$2" __tmp
+
+	__tmp=$( mktemp ) || return 1
+	if ! awk -v body="$__body" '
+		function trim(s) {
+			sub(/^[ \t]+/, "", s)
+			sub(/[ \t]+$/, "", s)
+			return s
+		}
+		function dump(   line) {
+			while ((getline line < body) > 0)
+				print line
+			close(body)
+		}
+		{ line[NR] = $0 }
+		END {
+			close_at = 0
+			for (i = NR; i >= 1; i--) {
+				if (trim(line[i]) == ")") {
+					close_at = i
+					break
+				}
+			}
+			if (!close_at)
+				exit 2
+			has = 0
+			while ((getline bline < body) > 0) {
+				if (index(bline, "SHORTCUT"))
+					has = 1
+			}
+			close(body)
+			if (has) {
+				prev = 0
+				for (i = close_at - 1; i >= 1; i--) {
+					if (trim(line[i]) != "") {
+						prev = i
+						break
+					}
+				}
+				if (prev && trim(line[prev]) != "(" &&
+					line[prev] !~ /,$/)
+					line[prev] = line[prev] ","
+			}
+			for (i = 1; i < close_at; i++)
+				print line[i]
+			dump()
+			for (i = close_at; i <= NR; i++)
+				print line[i]
+		}
+	' "$__file" > "$__tmp"; then
+		rm -f "$__tmp"
+		return 1
+	fi
+	if cmp -s "$__file" "$__tmp"; then
+		rm -f "$__tmp"
+		region_changed=
+		return 0
+	fi
+	cat "$__tmp" > "$__file" || {
+		rm -f "$__tmp"
+		return 1
+	}
+	rm -f "$__tmp"
+	region_changed=1
+}
+
+seed_menu()
+{
+	[ -f "$menu_file" ] && return 0
+	copy_first "$menu_file" \
+		/usr/local/share/WindowMaker/menu \
+		/usr/local/GNUstep/Library/WindowMaker/menu \
+		/usr/local/etc/WindowMaker/menu
+}
+
+reload_wmaker()
+{
+	local __me __pid
+
+	__me=$( id -un )
+	ps -ax -o pid,user,comm | awk -v u="$__me" '
+		$2 == u && $3 == "wmaker" { print $1 }
+	' | while read -r __pid; do
+		[ "$__pid" ] || continue
+		kill -USR1 "$__pid" || : signal failed
+	done
+}
+
+main()
+{
+	local __chords __taken __body __seen __kind
+
+	case "$1" in
+	--wait) apply_wait wmaker_up || exit 0 ;;
+	*) wmaker_up || exit 0
+	esac
+	[ "$HOME" ] || exit 0
+	bh_resolve || exit 0
+	menu_path
+	seed_menu || exit 0
+	[ -f "$menu_file" ] || exit 0
+	__kind=$( menu_kind )
+	__chords=$( mktemp ) || exit 0
+	__taken=$( mktemp ) || exit 0
+	__body=$( mktemp ) || exit 0
+	__seen=$( mktemp ) || exit 0
+	seen="$__seen"
+	trap 'rm -f "$__chords" "$__taken" "$__body" "$__seen"' EXIT
+	chord_file "$__chords" || exit 0
+	wm_taken "$menu_file" > "$__taken"
+	case "$__kind" in
+	menu)
+		emit_menu "$__chords" "$__taken" > "$__body"
+		replace_region "$menu_file" "$begin" "$end" "$__body" ||
+			exit 0
+		;;
+	paren)
+		emit_paren "$__chords" "$__taken" > "$__body"
+		if has_line "$menu_file" "$pbegin"; then
+			replace_region "$menu_file" "$pbegin" "$pend" \
+				"$__body" || exit 0
+		else
+			insert_paren "$menu_file" "$__body" || exit 0
+		fi
+		;;
+	*) exit 0
+	esac
+	[ "$region_changed" ] && reload_wmaker
+}
+
+case "$0" in
+*bhotkeys-windowmaker-apply) main "$@" ;;
+esac
+
+################################################################################
+# END
+################################################################################

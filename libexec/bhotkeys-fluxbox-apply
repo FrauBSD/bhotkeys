@@ -1,0 +1,158 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Grab listener chords in fluxbox $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Grab listener chords in fluxbox so the focused client does not
+# see them. Each new chord runs true. A chord the keys file already
+# names is left alone. Missing fluxbox is not an error.
+#
+############################################################ GLOBALS
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+bh_wm=fluxbox
+
+begin='# bhotkeys'
+end='# /bhotkeys'
+
+############################################################ FUNCTIONS
+
+fluxbox_up()
+{
+	proc_eq fluxbox
+}
+
+keys_path()
+{
+	local __line __path
+
+	keys_file="$HOME/.fluxbox/keys"
+	[ -f "$HOME/.fluxbox/init" ] || return 0
+	__line=$( awk -F: '
+		/^session.keyFile:/ {
+			sub(/^[ \t]+/, "", $2)
+			sub(/[ \t]+$/, "", $2)
+			print $2
+			exit
+		}
+	' "$HOME/.fluxbox/init" )
+	[ "$__line" ] || return 0
+	case "$__line" in
+	~/*) __path="$HOME/${__line#~/}" ;;
+	/*) __path="$__line" ;;
+	*) return 0
+	esac
+	case "$__path" in
+	"$HOME"/*) keys_file="$__path" ;;
+	esac
+}
+
+# Specs already in the keys file, outside the block this script owns
+flux_taken()
+{
+	awk '
+		function trim(s) {
+			sub(/^[ \t]+/, "", s)
+			sub(/[ \t]+$/, "", s)
+			return s
+		}
+		{
+			t = trim($0)
+		}
+		t == "# bhotkeys" { skip = 1; next }
+		t == "# /bhotkeys" { skip = 0; next }
+		skip { next }
+		{
+			line = t
+			if (line ~ /^#/ || line ~ /^!/)
+				next
+			sub(/[ \t]*:.*/, "", line)
+			gsub(/[ \t]+/, " ", line)
+			if (line != "")
+				print line
+		}
+	' "$1"
+}
+
+emit_block()
+{
+	local __chords="$1" __taken="$2" __id __spec
+
+	printf '%s\n' "$begin"
+	while IFS='	' read -r __id __spec; do
+		[ "$__id" ] || continue
+		quietly grep -F -x "$__spec" "$__taken" &&
+			continue
+		awk -v s="$__spec" '
+			index($0, s " ") == 1 { found = 1 }
+			END { exit !found }
+		' "$__taken" && continue
+		quietly grep -F -x "$__spec" "$seen" &&
+			continue
+		printf '%s\n' "$__spec" >> "$seen"
+		printf '%s :Exec /usr/bin/true\n' "$__spec"
+	done < "$__chords"
+	printf '%s\n' "$end"
+}
+
+seed_keys()
+{
+	[ -f "$keys_file" ] && return 0
+	copy_first "$keys_file" \
+		/usr/local/share/fluxbox/keys \
+		/usr/share/fluxbox/keys
+}
+
+reload_fluxbox()
+{
+	have fluxbox-remote || return 0
+	quietly fluxbox-remote reconfigure || : remote failed
+}
+
+main()
+{
+	local __chords __taken __body __seen
+
+	case "$1" in
+	--wait) apply_wait fluxbox_up || exit 0 ;;
+	*) fluxbox_up || exit 0
+	esac
+	[ "$HOME" ] || exit 0
+	bh_resolve || exit 0
+	keys_path
+	seed_keys || exit 0
+	[ -f "$keys_file" ] || exit 0
+	__chords=$( mktemp ) || exit 0
+	__taken=$( mktemp ) || exit 0
+	__body=$( mktemp ) || exit 0
+	__seen=$( mktemp ) || exit 0
+	seen="$__seen"
+	trap 'rm -f "$__chords" "$__taken" "$__body" "$__seen"' EXIT
+	chord_file "$__chords" || exit 0
+	flux_taken "$keys_file" > "$__taken"
+	emit_block "$__chords" "$__taken" > "$__body"
+	replace_region "$keys_file" "$begin" "$end" "$__body" || exit 0
+	[ "$region_changed" ] && reload_fluxbox
+}
+
+case "$0" in
+*bhotkeys-fluxbox-apply) main "$@" ;;
+esac
+
+################################################################################
+# END
+################################################################################

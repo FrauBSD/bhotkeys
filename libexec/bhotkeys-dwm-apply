@@ -1,0 +1,151 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Plant dwm keys for the next rebuild $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# dwm has no runtime key injection. This writes a keys-array fragment
+# and, when config.h has the stock keys array, includes that fragment
+# at the end so an earlier dwm binding keeps the chord. The running
+# binary picks the grabs up on the next rebuild. This script does not
+# rebuild or restart dwm. Missing dwm is not an error.
+#
+############################################################ GLOBALS
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+bh_wm=dwm
+
+############################################################ FUNCTIONS
+
+dwm_up()
+{
+	proc_eq dwm
+}
+
+emit_header()
+{
+	local __chords="$1" __id __key
+
+	printf '%s\n' '/* Listener chords. Each one runs true. */'
+	while IFS='	' read -r __id __key; do
+		[ "$__id" ] || continue
+		quietly grep -F -x "$__key" "$seen" && continue
+		printf '%s\n' "$__key" >> "$seen"
+		printf '\t{ %s, spawn, {.v = (const char *[]){ "/usr/bin/true", NULL } } },\n' \
+			"$__key"
+	done < "$__chords"
+}
+
+# Include the fragment once, just before the keys array closes
+plant_include()
+{
+	local __cfg="$1" __inc="$2" __tmp
+
+	[ -f "$__cfg" ] || return 0
+	case "$__inc" in
+	*\"*|*\\*) return 0 ;;
+	esac
+	quietly grep -F "$__inc" "$__cfg" && return 0
+	__tmp=$( mktemp ) || return 1
+	if ! awk -v inc="$__inc" '
+		function trim(s) {
+			sub(/^[ \t]+/, "", s)
+			sub(/[ \t]+$/, "", s)
+			return s
+		}
+		{
+			t = trim($0)
+			if (!started &&
+				(t == "static Key keys[] = {" ||
+				t == "static const Key keys[] = {"))
+				started = 1
+			if (started && !done && t == "};") {
+				print "#include \"" inc "\""
+				done = 1
+			}
+			print
+		}
+		END {
+			if (!done)
+				exit 2
+		}
+	' "$__cfg" > "$__tmp"; then
+		rm -f "$__tmp"
+		return 0
+	fi
+	cat "$__tmp" > "$__cfg" || {
+		rm -f "$__tmp"
+		return 1
+	}
+	rm -f "$__tmp"
+}
+
+header_path()
+{
+	hdr_file="$HOME/.config/bhotkeys/dwm.keys.h"
+}
+
+find_config()
+{
+	local __c
+
+	cfg_file=
+	for __c in \
+		"$HOME/dwm/config.h" \
+		"$HOME/src/dwm/config.h" \
+		"$HOME/.dwm/config.h"
+	do
+		if [ -f "$__c" ]; then
+			cfg_file="$__c"
+			return 0
+		fi
+	done
+	return 1
+}
+
+main()
+{
+	local __chords __body __seen
+
+	case "$1" in
+	--wait) apply_wait dwm_up || exit 0 ;;
+	*) dwm_up || exit 0
+	esac
+	[ "$HOME" ] || exit 0
+	bh_resolve || exit 0
+	header_path
+	__chords=$( mktemp ) || exit 0
+	__body=$( mktemp ) || exit 0
+	__seen=$( mktemp ) || exit 0
+	seen="$__seen"
+	trap 'rm -f "$__chords" "$__body" "$__seen"' EXIT
+	chord_file "$__chords" || exit 0
+	emit_header "$__chords" > "$__body"
+	mkdir -p "${hdr_file%/*}" || exit 0
+	if [ ! -f "$hdr_file" ] || ! cmp -s "$hdr_file" "$__body"; then
+		cat "$__body" > "$hdr_file" || exit 0
+	fi
+	find_config || exit 0
+	plant_include "$cfg_file" "$hdr_file"
+}
+
+case "$0" in
+*bhotkeys-dwm-apply) main "$@" ;;
+esac
+
+################################################################################
+# END
+################################################################################

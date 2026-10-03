@@ -1,0 +1,198 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Grab listener chords in LXQt $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Grab listener chords in LXQt so the focused client does not see
+# them. Each new chord runs true. A shortcut the config already
+# names is left alone. The keys daemon is stopped, the file is
+# written, then the daemon is started again. Missing lxqt-session
+# is not an error.
+#
+############################################################ GLOBALS
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+bh_wm=lxqt
+
+############################################################ FUNCTIONS
+
+lxqt_up()
+{
+	proc_eq lxqt-session
+}
+
+conf_path()
+{
+	if [ "$XDG_CONFIG_HOME" ]; then
+		conf_file="$XDG_CONFIG_HOME/lxqt/globalkeyshortcuts.conf"
+	else
+		conf_file="$HOME/.config/lxqt/globalkeyshortcuts.conf"
+	fi
+}
+
+build_want()
+{
+	local __chords="$1" __id __enc
+
+	while IFS='	' read -r __id __enc; do
+		[ "$__id" ] || continue
+		quietly grep -F -x "$__enc" "$seen" &&
+			continue
+		printf '%s\n' "$__enc" >> "$seen"
+		printf '%s %s\n' "$__enc" "$__id"
+	done < "$__chords"
+}
+
+# stdout is the merged config. $1 is the current file, $2 is want
+merge_conf()
+{
+	awk -v want="$2" '
+		function trim(s) {
+			sub(/^[ \t]+/, "", s)
+			sub(/[ \t]+$/, "", s)
+			return s
+		}
+		BEGIN {
+			while ((getline line < want) > 0) {
+				split(line, a, " ")
+				if (a[1] == "" || a[2] == "")
+					continue
+				n++
+				enc[n] = a[1]
+				id[n] = a[2]
+			}
+			close(want)
+		}
+		{
+			t = trim($0)
+		}
+		t ~ /^\[/ {
+			hdr = t
+			sub(/^\[/, "", hdr)
+			sub(/\]$/, "", hdr)
+			if (hdr ~ /\.bhotkeys-[A-Za-z0-9_-]+$/) {
+				skip = 1
+				next
+			}
+			skip = 0
+			o = hdr
+			sub(/\.[^.]*$/, "", o)
+			owned[o] = 1
+		}
+		skip { next }
+		{ print }
+		END {
+			for (i = 1; i <= n; i++) {
+				if (owned[enc[i]])
+					continue
+				print ""
+				print "[" enc[i] ".bhotkeys-" id[i] "]"
+				print "Comment=bhotkeys"
+				print "Enabled=true"
+				print "Exec=/usr/bin/true"
+			}
+		}
+	' "$1"
+}
+
+seed_conf()
+{
+	[ -f "$conf_file" ] && return 0
+	copy_first "$conf_file" \
+		/usr/local/share/lxqt/globalkeyshortcuts.conf \
+		/usr/local/etc/xdg/lxqt/globalkeyshortcuts.conf \
+		/usr/local/share/lxqt/lxqt-globalkeys/globalkeyshortcuts.conf \
+		/usr/share/lxqt/globalkeyshortcuts.conf
+}
+
+keysd_pid()
+{
+	local __me
+
+	__me=$( id -un )
+	ps -ax -o pid,user,comm | awk -v u="$__me" '
+		$2 == u && $3 == "lxqt-globalkeysd" { print $1; exit }
+	'
+}
+
+stop_keysd()
+{
+	local __pid __i
+
+	__pid=$( keysd_pid )
+	[ "$__pid" ] || return 0
+	kill -TERM "$__pid" 2> /dev/null || : stop failed
+	__i=0
+	while [ "$__i" -lt 20 ]; do
+		__pid=$( keysd_pid )
+		[ "$__pid" ] || return 0
+		sleep 0.1
+		__i=$(( $__i + 1 ))
+	done
+}
+
+start_keysd()
+{
+	local __pid
+
+	__pid=$( keysd_pid )
+	[ "$__pid" ] && return 0
+	have lxqt-globalkeysd || return 0
+	/usr/sbin/daemon -f lxqt-globalkeysd || : start failed
+}
+
+main()
+{
+	local __chords __want __new __seen __was
+
+	case "$1" in
+	--wait) apply_wait lxqt_up || exit 0 ;;
+	*) lxqt_up || exit 0
+	esac
+	[ "$HOME" ] || exit 0
+	bh_resolve || exit 0
+	conf_path
+	seed_conf || exit 0
+	[ -f "$conf_file" ] || exit 0
+	__chords=$( mktemp ) || exit 0
+	__want=$( mktemp ) || exit 0
+	__new=$( mktemp ) || exit 0
+	__seen=$( mktemp ) || exit 0
+	seen="$__seen"
+	trap 'rm -f "$__chords" "$__want" "$__new" "$__seen"' EXIT
+	chord_file "$__chords" || exit 0
+	build_want "$__chords" > "$__want"
+	merge_conf "$conf_file" "$__want" > "$__new" || exit 0
+	if cmp -s "$conf_file" "$__new"; then
+		exit 0
+	fi
+	__was=$( keysd_pid )
+	[ "$__was" ] && stop_keysd
+	if ! cat "$__new" > "$conf_file"; then
+		[ "$__was" ] && start_keysd
+		exit 0
+	fi
+	[ "$__was" ] && start_keysd
+}
+
+case "$0" in
+*bhotkeys-lxqt-apply) main "$@" ;;
+esac
+
+################################################################################
+# END
+################################################################################

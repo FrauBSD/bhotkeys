@@ -1,0 +1,293 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Subroutines shared by the apply scripts $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Shared by the apply scripts: program lookup, gsettings helpers,
+# the chord list, and marker-region file edits. bh_wm names the
+# --print-keys format. A swallow chord is a listen 1, enabled 1 row:
+# the listener handles it, and the window manager is asked to grab
+# it and run true.
+#
+############################################################ CONFIG
+
+case "$0" in
+*bhotkeys-seq.subr) exit 0 ;;
+esac
+
+############################################################ FUNCTIONS
+
+quietly() { "$@" > /dev/null 2>&1; }
+have() { quietly command -v "$@"; }
+
+proc_eq()
+{
+	ps -ax -o comm= | awk -v n="$1" '
+		BEGIN { s = 1 }
+		$0 == n { s = 0 }
+		END { exit s }
+	' # END-QUOTE
+}
+
+# Poll a readiness probe once a second for up to $2 seconds (30)
+apply_wait()
+{
+	local __probe="$1" __secs="${2:-30}" __i=0
+
+	while :; do
+		"$__probe" && return 0
+		__i=$(( $__i + 1 ))
+		[ $__i -lt $__secs ] || return 1
+		sleep 1
+	done
+}
+
+bh_resolve()
+{
+	BH="${BHOTKEYS:-bhotkeys}"
+	if ! have "$BH"; then
+		if [ -x /home/dteske/bin/bhotkeys ]; then
+			BH=/home/dteske/bin/bhotkeys
+		elif [ -x /usr/local/bin/bhotkeys ]; then
+			BH=/usr/local/bin/bhotkeys
+		else
+			return 1
+		fi
+	fi
+}
+
+# Drop an inherited bus whose socket is gone. libdbus then uses the
+# address published for this display
+bus_ok()
+{
+	local __addr __path
+
+	__addr="${DBUS_SESSION_BUS_ADDRESS-}"
+	case "$__addr" in
+	unix:path=*)
+		__path="${__addr#unix:path=}"
+		__path="${__path%%,*}"
+		[ -S "$__path" ] && return 0
+		unset DBUS_SESSION_BUS_ADDRESS
+		;;
+	*) : ok
+	esac
+}
+
+lower1()
+{
+	local __k="$1" __var_to_set="$2"
+
+	case "$__k" in
+	A) __k=a ;;
+	B) __k=b ;;
+	C) __k=c ;;
+	D) __k=d ;;
+	E) __k=e ;;
+	F) __k=f ;;
+	G) __k=g ;;
+	H) __k=h ;;
+	I) __k=i ;;
+	J) __k=j ;;
+	K) __k=k ;;
+	L) __k=l ;;
+	M) __k=m ;;
+	N) __k=n ;;
+	O) __k=o ;;
+	P) __k=p ;;
+	Q) __k=q ;;
+	R) __k=r ;;
+	S) __k=s ;;
+	T) __k=t ;;
+	U) __k=u ;;
+	V) __k=v ;;
+	W) __k=w ;;
+	X) __k=x ;;
+	Y) __k=y ;;
+	Z) __k=z ;;
+	*) : ok
+	esac
+	eval $__var_to_set=\"\$__k\"
+}
+
+unquote()
+{
+	local __s="$1" __var_to_set="$2"
+
+	case "$__s" in
+	\'*\')
+		__s="${__s#\'}"
+		__s="${__s%\'}"
+		;;
+	*) : ok
+	esac
+	eval $__var_to_set=\"\$__s\"
+}
+
+gs_get()
+{
+	local __var_to_set="$3"
+	local __val
+
+	__val=$( gsettings get "$1" "$2" ) || return 1
+	eval $__var_to_set=\"\$__val\"
+}
+
+# id, tab, chord for every swallow row of this window manager
+chord_file()
+{
+	local __out="$1"
+
+	"$BH" --print-keys "$bh_wm" | awk -F '\t' '
+		$2 == 1 && $3 == 1 && $1 ~ /^[A-Za-z0-9_-]+$/ {
+			print $1 "\t" $4
+		}
+	' > "$__out"
+}
+
+copy_first()
+{
+	local __dest="$1" __src
+
+	shift # dest
+	for __src in "$@"; do
+		if [ -f "$__src" ]; then
+			mkdir -p "${__dest%/*}" || return 1
+			cp "$__src" "$__dest" || return 1
+			return 0
+		fi
+	done
+	return 1
+}
+
+has_line()
+{
+	local __file="$1" __line="$2"
+
+	[ -f "$__file" ] || return 1
+	awk -v b="$__line" '
+		function trim(s) {
+			sub(/^[ \t]+/, "", s)
+			sub(/[ \t]+$/, "", s)
+			return s
+		}
+		{ if (trim($0) == b) found = 1 }
+		END { exit !found }
+	' "$__file"
+}
+
+# Replace the marker region, or append the body if the markers are
+# absent. The body file includes both marker lines. region_changed
+# is 1 when the destination bytes change
+replace_region()
+{
+	local __file="$1" __begin="$2" __end="$3" __body="$4" __tmp
+
+	__tmp=$( mktemp ) || return 1
+	if ! awk -v b="$__begin" -v e="$__end" -v body="$__body" '
+		function trim(s) {
+			sub(/^[ \t]+/, "", s)
+			sub(/[ \t]+$/, "", s)
+			return s
+		}
+		function dump(   line) {
+			while ((getline line < body) > 0)
+				print line
+			close(body)
+		}
+		{
+			t = trim($0)
+		}
+		t == b {
+			if (skip || dumped) {
+				bad = 1
+				exit 2
+			}
+			dumped = 1
+			skip = 1
+			dump()
+			next
+		}
+		skip && t == e {
+			skip = 0
+			next
+		}
+		skip { next }
+		{ print }
+		END {
+			if (bad)
+				exit 2
+			if (skip)
+				exit 2
+			if (!dumped)
+				dump()
+		}
+	' "$__file" > "$__tmp"; then
+		rm -f "$__tmp"
+		return 1
+	fi
+	if cmp -s "$__file" "$__tmp"; then
+		rm -f "$__tmp"
+		region_changed=
+		return 0
+	fi
+	cat "$__tmp" > "$__file" || {
+		rm -f "$__tmp"
+		return 1
+	}
+	rm -f "$__tmp"
+	region_changed=1
+}
+
+# Insert the body once, in front of the first line matching ere.
+# region_changed is 1 when the destination bytes change
+insert_before()
+{
+	local __file="$1" __ere="$2" __body="$3" __tmp
+
+	__tmp=$( mktemp ) || return 1
+	if ! awk -v ere="$__ere" -v body="$__body" '
+		function dump(   line) {
+			while ((getline line < body) > 0)
+				print line
+			close(body)
+		}
+		$0 ~ ere && !done {
+			dump()
+			done = 1
+		}
+		{ print }
+		END {
+			if (!done)
+				exit 2
+		}
+	' "$__file" > "$__tmp"; then
+		rm -f "$__tmp"
+		return 1
+	fi
+	if cmp -s "$__file" "$__tmp"; then
+		rm -f "$__tmp"
+		region_changed=
+		return 0
+	fi
+	cat "$__tmp" > "$__file" || {
+		rm -f "$__tmp"
+		return 1
+	}
+	rm -f "$__tmp"
+	region_changed=1
+}
+
+################################################################################
+# END
+################################################################################

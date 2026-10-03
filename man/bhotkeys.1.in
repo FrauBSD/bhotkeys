@@ -1,0 +1,569 @@
+.\" Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd October 2, 2026
+.Dt BHOTKEYS 1
+.Os
+.Sh NAME
+.Nm bhotkeys
+.Nd plugin hotkey listener
+.Sh SYNOPSIS
+.Nm
+.Fl Fl daemon
+.Op Fl Fl greeter
+.Op Fl Fl wm Ar name
+.Nm
+.Fl Fl panel
+.Op Fl Fl greeter
+.Nm
+.Fl Fl print-keys Ar format
+.Op Fl Fl wm Ar name
+.Sh DESCRIPTION
+.Nm
+watches key presses through the X Record extension and runs the
+command of the plugin whose chord matches.
+It does not grab the keyboard in normal operation, and it does not
+consume the event, so the window manager and every other client
+still see the key.
+Each window manager has an apply script in
+.Pa @PREFIX@/libexec/bhotkeys .
+It reads
+.Fl Fl print-keys
+and registers each chord the listener handles with the window
+manager, to run
+.Pa /usr/bin/true .
+The window manager grabs that chord, so the focused client does not
+see it.
+A chord the window manager already owns is left alone.
+The keyboard is grabbed only while the chord list is capturing a
+new chord.
+.Pp
+No action ships with
+.Nm
+except the chords that open the list.
+.Sy Panel
+defaults to
+.Sy Super+? .
+It has no check box.
+The chord can be changed.
+It stays on until
+.Nm bhotkeys-panel
+.Fl Fl disable .
+.Sy Panel alt
+is
+.Sy Super+/
+by default.
+Its check box turns that chord off.
+Every other chord comes from a plugin.
+If a list chord has been changed or forgotten,
+.Nm
+.Fl Fl panel
+opens the list anyway.
+.Pp
+One listener serves one X display.
+The greeter runs a separate listener
+.Pq Fl Fl greeter
+and does not share a process with the session.
+A second session listener finds the lock held and exits.
+The listener re-reads plugins when the session file's modification
+time changes.
+Opening the list always reads the plugins anew.
+.Pp
+The options are as follows:
+.Bl -tag -width "--print-keys"
+.It Fl Fl daemon
+Listen on
+.Ev DISPLAY .
+If no known window manager is running yet, wait up to 30 seconds for
+one before loading plugins, so that
+.Li enabled ,
+.Li chord ,
+and
+.Li session
+lines resolve as the chord list will later see them.
+.Fl Fl wm
+skips the wait.
+With
+.Fl Fl greeter ,
+listen for the login greeter.
+.It Fl Fl greeter
+Select the greeter.
+Plugins marked
+.Li greeter 0
+are ignored.
+Overrides are read from
+.Pa @PREFIX@/etc/bhotkeys/greeter .
+The list opened for the greeter is read-only until its unlock
+password is entered.
+See
+.Xr bhotkeys-passwd 1 .
+.It Fl Fl panel
+Open the chord list on the monitor under the pointer.
+The list process is
+.Nm bhotkeys-panel .
+With
+.Fl Fl greeter ,
+the list is the greeter's read-only list.
+.It Fl Fl print-keys Ar format
+Print the chords spelled for one window manager, then exit.
+.Ar format
+is one of
+.Cm bvwm , cinnamon , dwm , fluxbox , fvwm , gnome , i3 , kde ,
+.Cm lxde , lxqt , mate , openbox , windowmaker , xfce ,
+or
+.Cm xmonad .
+.Pp
+Every format except
+.Cm fvwm
+and
+.Cm bvwm
+prints one tab-separated row per plugin shown in this session:
+the
+.Li id ,
+the
+.Li listen
+field, the enabled state
+.Pq Li 0 No or Li 1 ,
+the chord as that window manager's configuration writes it, and the
+label.
+.Cm kde
+adds the Qt key code before the label.
+A
+.Li listen 1
+chord on an XF86 key is left out: it inserts no character, so there
+is nothing to swallow.
+Panel and Panel alt are
+.Li listen 1
+rows.
+No column is empty.
+.Pp
+.Cm fvwm
+and
+.Cm bvwm
+print
+.Xr fvwm 1
+.Cm Key
+lines for every plugin shown in this session, and for Panel and
+Panel alt.
+A plugin whose
+.Li listen
+field is 0 is a window manager key: its action is the plugin
+command, run through
+.Nm bhotkeys-bvwm-run .
+A plugin whose
+.Li listen
+field is 1 is a listener key: its action is
+.Cm Nop ,
+so the window manager grabs the chord and the focused client does
+not see it.
+XF86 keys are included.
+A disabled plugin of either kind is printed with the action
+.Ql - ,
+which unbinds the chord; those lines print first.
+A
+.Li listen 0
+plugin with no command only documents a key the window manager
+owns, and is not printed.
+.It Fl Fl wm Ar name
+Treat
+.Ar name
+as the running window manager instead of detecting one.
+.Ar name
+is one of the window manager names a plugin may use on its
+.Li chord ,
+.Li enabled ,
+and
+.Li session
+lines, matched without regard to case.
+Program-name tokens on those lines still match the running commands.
+This masters one window manager's files from another, as when the
+first cannot start.
+An unknown
+.Ar name
+is an error.
+.El
+.Pp
+An unrecognized option, or no options, prints the usage and exits non-zero.
+.Sh PANEL
+The list is an overlay.
+.Sy Esc
+closes it.
+A check enables or disables that plugin.
+.Sy "Set keys"
+grabs the keyboard until the next chord, which is stored for that
+row.
+.Sy Reset
+puts back the chord selected for the running window manager.
+The check box is left as it was saved.
+.Sy Window
+hands the same list to the window manager as an ordinary decorated
+window, and
+.Sy Overlay
+turns it back.
+A plugin whose
+.Li id
+is
+.Li lock
+closes the overlay before its command runs, and leaves a decorated
+list window alone.
+.Pp
+Column headings sort the rows.
+The same heading cycles through ascending, descending, and no sort.
+With no sort, rows are ordered by the group string, then by name.
+The built-in list has two rows and no plugin file.
+Their heading is
+.Li x11/bhotkeys .
+Panel has no check box.
+The Panel alt check box turns its chord off.
+.Bl -tag -width indent
+.It Nm bhotkeys-panel Fl Fl disable
+Turns the Panel and Panel alt chords off, so no chord opens the
+list.
+The running listener picks up the change.
+.Nm
+.Fl Fl panel
+still opens the list, and does not turn either chord back on.
+.It Nm bhotkeys-panel Fl Fl enable
+Turns both chords back on.
+.El
+.Pp
+Add
+.Fl Fl greeter
+to either command to change the greeter instead of the session.
+That write requires the super-user.
+An open list is closed by
+.Fl Fl disable ,
+including one that was handed to the window manager.
+.Sh PLUGINS
+A plugin is a text file.
+One file describes one plugin.
+Blank lines and lines beginning with
+.Ql #
+are ignored.
+The listener scans
+.Pa @PREFIX@/share/bhotkeys/plugins.d ,
+then
+.Pa ~/share/bhotkeys/plugins.d ,
+then the directory named by
+.Ev BHOTKEYS_PLUGINS .
+A later directory replaces the same
+.Li id .
+The user's directory overrides a system plugin, and
+.Ev BHOTKEYS_PLUGINS
+overrides both.
+.Pp
+A field is a keyword, a space, and the rest of the line:
+.Bl -tag -width "command"
+.It Li id
+Required name.
+A plugin with
+.Li listen 1
+also requires
+.Li command .
+.It Li label
+Text shown in the list.
+Defaults to
+.Li id .
+.It Li group
+The list heading, shown exactly as written.
+Nothing is prefixed or renamed.
+An omitted group is a blank heading.
+.It Li chord
+Chord for this plugin.
+More than one
+.Li chord
+line is allowed.
+See
+.Sx "Chords and window managers"
+below.
+.It Li enabled
+.Li 0
+or
+.Li 1 .
+More than one line is allowed, with the same window-manager rule
+as
+.Li chord .
+No
+.Li enabled
+line means on.
+.It Li command
+Command run when the chord matches.
+The rest of the line is the command.
+.It Li repeat
+Non-zero repeats the command while the chord is held.
+A command still running does not start another copy; further
+repeats wait, and releasing the chord stops them.
+The default is 0.
+.It Li greeter
+.Li 1
+if the greeter listener may run this plugin.
+The default is 0.
+.It Li session
+.Li 0
+hides the plugin from a user session.
+.Li 1
+shows it.
+More than one line is allowed, with the same window-manager rule
+as
+.Li chord .
+No
+.Li session
+line means shown.
+The greeter list uses
+.Li greeter
+instead.
+.It Li listen
+.Li 0
+shows the plugin in the list and in
+.Fl Fl print-keys ,
+and
+.Nm
+does not listen for it.
+The default is 1.
+.It Li desc
+One line of description, searched from the list.
+.It Li desc_greeter
+Optional description shown when the list is the greeter.
+When the line is absent, the greeter shows
+.Li desc .
+.El
+.Ss Chords and window managers
+A chord is zero or more of
+.Sy Super+ ,
+.Sy Alt+ ,
+.Sy Shift+ ,
+and
+.Sy Ctrl+ ,
+then a keysym name.
+Spaces are ignored.
+The names
+.Li slash ,
+.Li space ,
+.Li question ,
+and
+.Li grave
+are slash, Space, question mark, and grave accent.
+A single letter is that letter.
+Anything else is passed to
+.Fn XStringToKeysym .
+.Pp
+Tokens after the chord name the window managers that line is for.
+The word
+.Li default
+is a fallback, not a manager name.
+A line with no tokens after the chord is also a fallback; the word
+is needed only to make a line that names managers a fallback as
+well.
+The first line that names the running manager is used, even when a
+fallback line is written above it.
+If none names it, the first fallback is used.
+Two fallbacks: the first one wins.
+A line that only names other managers is not a fallback, so the
+plugin can have no chord on this manager.
+A chord that does not parse disables the plugin.
+.Pp
+The known names, matched case-insensitively, are
+.Cm afterstep ,
+.Cm awesome ,
+.Cm bspwm ,
+.Cm bvwm ,
+.Cm cinnamon ,
+.Cm cwm ,
+.Cm dwm ,
+.Cm enlightenment ,
+.Cm fluxbox ,
+.Cm fvwm ,
+.Cm gnome ,
+.Cm herbstluftwm ,
+.Cm i3 ,
+.Cm icewm ,
+.Cm jwm ,
+.Cm kde ,
+.Cm lxde ,
+.Cm lxqt ,
+.Cm mate ,
+.Cm openbox ,
+.Cm pekwm ,
+.Cm spectrwm ,
+.Cm sway ,
+.Cm windowmaker ,
+and
+.Cm xfce .
+.Cm bvwm
+is not
+.Cm fvwm .
+If both are running,
+.Cm bvwm
+wins.
+.Cm fvwm
+matches
+.Sy fvwm ,
+.Sy fvwm2 ,
+or
+.Sy fvwm3 .
+.Cm kde
+matches KWin, not a process named
+.Ql kde .
+.Cm gnome
+matches
+.Sy gnome-shell .
+.Cm xfce
+matches
+.Sy xfwm4 .
+.Cm windowmaker
+matches
+.Sy wmaker .
+.Cm cinnamon
+matches
+.Sy cinnamon
+or
+.Sy muffin .
+.Cm mate
+matches
+.Sy marco .
+.Cm lxde
+matches
+.Sy lxsession .
+.Cm lxqt
+matches
+.Sy lxqt-session .
+Those two are checked before
+.Cm kde ,
+.Cm gnome ,
+.Cm xfce ,
+and
+.Cm openbox ,
+so a session that runs one of those as its window manager is still
+.Cm lxde
+or
+.Cm lxqt .
+A token that is not one of these names is a command name, matched
+case-sensitively against a running command.
+.Pp
+.Li enabled
+and
+.Li session
+use the same rule.
+The first token of either is
+.Li 0
+or
+.Li 1 ,
+and only those two values are accepted.
+.Bd -literal -offset indent
+chord Super+e
+chord Super+Shift+e kde
+enabled 1
+enabled 0 gnome
+session 1
+session 0 xfce
+.Ed
+.Pp
+On KDE the chord is
+.Sy Super+Shift+e ;
+everywhere else it is
+.Sy Super+e .
+On GNOME the plugin is off; elsewhere it is on.
+The row is hidden on Xfce, where neither the chord nor the enabled
+bit matters, and shown on every other manager.
+.Bd -literal -offset indent
+chord Super+e default fvwm
+chord Super+Shift+e kde
+.Ed
+.Pp
+makes
+.Sy Super+e
+the fvwm chord and the fallback for every other manager, and
+.Sy Super+Shift+e
+the KDE chord.
+Without the word, the first line would be fvwm only and a third line
+would be needed for the fallback.
+.Pp
+Once the plugin file has picked a chord and an enabled bit for the
+running window manager, a session file line that names that manager
+replaces both.
+A line saved under one manager does not apply under another.
+It leaves
+.Li session
+as written in the plugin file.
+Each line is
+.Pp
+.Dl id enabled chord wm
+.Pp
+and the list's own lines are
+.Pp
+.Dl panel enabled chord wm
+.Dl panel-alt enabled chord wm
+.Pp
+.Li panel
+.Li enabled
+is 0 when the Panel chord does not open the list.
+.Li panel-alt
+.Li enabled
+is 0 when the Panel alt chord does not open the list.
+With no such line for this manager, that chord is on.
+A line with no window manager name is ignored.
+.Sy Reset
+restores the window-manager chord.
+It does not change the check box.
+.Sh ENVIRONMENT
+.Bl -tag -width "BHOTKEYS_PLUGINS"
+.It Ev DISPLAY
+X server to watch.
+.It Ev BHOTKEYS_PLUGINS
+Extra plugin directory, scanned last.
+A file here replaces the same
+.Li id
+from either directory above.
+.It Ev HOME
+Used for
+.Pa ~/share/bhotkeys/plugins.d ,
+.Pa ~/.config/bhotkeys/session ,
+and
+.Pa ~/.config/bhotkeys/panel-ui
+when
+.Ev XDG_CONFIG_HOME
+is unset.
+.It Ev XDG_CONFIG_HOME
+When set, the session file is
+.Pa $XDG_CONFIG_HOME/bhotkeys/session .
+.It Ev XDG_RUNTIME_DIR
+Directory of the session lock,
+.Pa bhotkeys.lock .
+When unset, the lock is
+.Pa /tmp/bhotkeys.lock .
+.El
+.Sh FILES
+.Bl -tag -width "@PREFIX@/share/bhotkeys/plugins.d"
+.It Pa @PREFIX@/share/bhotkeys/plugins.d
+First plugin directory.
+.It Pa ~/share/bhotkeys/plugins.d
+Second plugin directory.
+.It Pa ~/.config/bhotkeys/session
+Session overrides.
+See
+.Ev XDG_CONFIG_HOME .
+.It Pa ~/.config/bhotkeys/panel-ui
+List sort and scroll.
+Not read at the greeter.
+.It Pa @PREFIX@/etc/bhotkeys/greeter
+Greeter overrides. Lines have no window manager name.
+.It Pa @PREFIX@/etc/bhotkeys.passwd
+Greeter unlock hash.
+See
+.Xr bhotkeys-passwd 1 .
+.It Pa /tmp/bhotkeys-greeter.lock
+Greeter listener lock.
+.El
+.Sh EXIT STATUS
+.Ex -std
+The session listener exits 0 when another session listener already
+holds the lock.
+It exits non-zero when it cannot open the display or the Record
+extension is missing.
+.Sh SEE ALSO
+.Xr bhotkeys-panel 1 ,
+.Xr bhotkeys-passwd 1 ,
+.Xr bhotkeys-start 1
+.Sh AUTHORS
+.An Devin Teske Aq Mt dteske@FreeBSD.org

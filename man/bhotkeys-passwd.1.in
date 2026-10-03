@@ -1,0 +1,34 @@
+.\" Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd September 29, 2026
+.Dt BHOTKEYS-PASSWD 1
+.Os
+.Sh NAME
+.Nm bhotkeys-passwd
+.Nd set the bhotkeys greeter unlock password
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm
+sets the password that unlocks the greeter chord list
+and writes
+.Pa @PREFIX@/etc/bhotkeys.passwd
+mode 0600.
+.Pp
+.Nm
+must be run by the super-user.
+An empty password is rejected.
+An unrecognized option prints the usage and exits non-zero.
+.Sh FILES
+.Bl -tag -width "@PREFIX@/etc/bhotkeys.passwd"
+.It Pa @PREFIX@/etc/bhotkeys.passwd
+Hash read by the greeter list.
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr bhotkeys 1
+.Sh AUTHORS
+.An Devin Teske Aq Mt dteske@FreeBSD.org

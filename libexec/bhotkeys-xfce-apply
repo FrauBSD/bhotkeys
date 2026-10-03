@@ -1,0 +1,383 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Register listener chords with Xfce $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Register bhotkeys chords with XFCE so the focused client does not
+# see them. Each new chord is a command shortcut that runs true.
+# A sequence XFCE already owns is left alone.
+#
+# bhotkeys --print-keys xfce supplies the chords as XFCE
+# accelerators
+#
+############################################################ GLOBALS
+
+pgm="${0##*/}" # Program basename
+
+channel=xfce4-keyboard-shortcuts
+mark=/usr/bin/true
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+
+plug_lib="${0%/*}/bhotkeys-plugin.subr"
+[ -f "$plug_lib" ] || plug_lib="${0%/*}/../../bhotkeys/bhotkeys-plugin.subr"
+[ -f "$plug_lib" ] || plug_lib=/usr/local/bhotkeys/bhotkeys-plugin.subr
+[ -f "$plug_lib" ] || exit 0
+. "$plug_lib"
+bh_wm=xfce
+bh_tag=xfconf
+
+############################################################ FUNCTIONS
+
+norm_of()
+{
+	local __rest="$1" __var_to_set="$2"
+	local __super= __pri= __alt= __shift=
+	local __mods __key __out
+
+	while :; do
+		case "$__rest" in
+		'<Super>'*)
+			__super=1
+			__rest="${__rest#<Super>}"
+			;;
+		'<Primary>'*)
+			__pri=1
+			__rest="${__rest#<Primary>}"
+			;;
+		'<Control>'*)
+			__pri=1
+			__rest="${__rest#<Control>}"
+			;;
+		'<Alt>'*)
+			__alt=1
+			__rest="${__rest#<Alt>}"
+			;;
+		'<Shift>'*)
+			__shift=1
+			__rest="${__rest#<Shift>}"
+			;;
+		*) break
+		esac
+	done
+	[ "$__rest" ] || return 1
+	lower1 "$__rest" __key
+	__mods=
+	[ "$__alt" ] && __mods="${__mods}Alt,"
+	[ "$__pri" ] && __mods="${__mods}Primary,"
+	[ "$__shift" ] && __mods="${__mods}Shift,"
+	[ "$__super" ] && __mods="${__mods}Super,"
+	__mods="${__mods%,}"
+	__out="$__mods|$__key"
+	eval $__var_to_set=\"\$__out\"
+}
+
+xfce_up()
+{
+	have xfconf-query || return 1
+	quietly xfconf-query -c "$channel" -l
+}
+
+want_has()
+{
+	local __norm="$1"
+	local __n __a
+
+	while IFS='	' read -r __n __a; do
+		[ "$__n" = "$__norm" ] && return 0
+	done < "$WANT"
+	return 1
+}
+
+owned_norm()
+{
+	local __norm="$1"
+	local __prop __val __suffix __n
+
+	while IFS='	' read -r __prop __val; do
+		[ "$__val" ] || continue
+		[ "$__val" = "$mark" ] && continue
+		case "$__prop" in
+		/commands/custom/*) __suffix="${__prop#/commands/custom/}" ;;
+		/xfwm4/custom/*) __suffix="${__prop#/xfwm4/custom/}" ;;
+		*) continue
+		esac
+		case "$__suffix" in
+		*/*|override) continue ;;
+		*) : ok
+		esac
+		norm_of "$__suffix" __n || continue
+		[ "$__n" = "$__norm" ] && return 0
+	done < "$HAVE"
+	return 1
+}
+
+ours_exact()
+{
+	local __acc="$1"
+	local __path="/commands/custom/$__acc"
+	local __prop __val
+
+	while IFS='	' read -r __prop __val; do
+		[ "$__prop" = "$__path" ] || continue
+		[ "$__val" = "$mark" ] && return 0
+		return 1
+	done < "$HAVE"
+	return 1
+}
+
+drop_stale()
+{
+	local __prop __val __suffix __n __acc
+
+	while IFS='	' read -r __prop __val; do
+		[ "$__val" = "$mark" ] || continue
+		case "$__prop" in
+		/commands/custom/*) __suffix="${__prop#/commands/custom/}" ;;
+		*) continue
+		esac
+		case "$__suffix" in
+		*/*|override) continue ;;
+		*) : ok
+		esac
+		norm_of "$__suffix" __n || continue
+		__acc=
+		if want_has "$__n"; then
+			while IFS='	' read -r __wn __wa; do
+				[ "$__wn" = "$__n" ] || continue
+				__acc="$__wa"
+				break
+			done < "$WANT"
+		fi
+		[ "$__suffix" = "$__acc" ] && continue
+		quietly xfconf-query -c "$channel" -p "$__prop" -r -R ||
+			: stale reset
+	done < "$HAVE"
+}
+
+set_free()
+{
+	local __n __acc __path
+
+	while IFS='	' read -r __n __acc; do
+		[ "$__n" ] || continue
+		[ "$__acc" ] || continue
+		owned_norm "$__n" && continue
+		ours_exact "$__acc" && continue
+		__path="/commands/custom/$__acc"
+		quietly xfconf-query -c "$channel" -p "$__path" -n -t string \
+			-s "$mark" || continue
+		quietly xfconf-query -c "$channel" \
+			-p "$__path/startup-notify" -n -t bool -s false ||
+			: notify
+	done < "$WANT"
+}
+
+prop_get()
+{
+	local __path="$1" __var_to_set="$2"
+	local __val
+
+	if xfconf-query -c "$channel" -p "$__path" > "$RAWP" 2> /dev/null
+	then
+		__val=
+		IFS= read -r __val < "$RAWP" || __val=
+	else
+		__val=__missing__
+	fi
+	eval $__var_to_set=\"\$__val\"
+}
+
+prop_set()
+{
+	local __path="$1" __val="$2"
+
+	# This xfconf-query still requires -n to create a property that
+	# was removed. -t alone is refused with "use the --create option".
+	quietly xfconf-query -c "$channel" -p "$__path" -n -t string \
+		-s "$__val" || : set
+}
+
+prop_reset()
+{
+	local __path="$1"
+
+	quietly xfconf-query -c "$channel" -p "$__path" -r -R || : reset
+}
+
+#
+# listen 0 rows name an XFCE command in a "# xfconf" comment.
+# bhotkeys --print-keys xfce supplies enable and the accelerator.
+# Push that into the custom shortcut. A disabled row is removed. An
+# empty command stays grabbed and xfsettingsd pops an error when the
+# key is pressed. With /commands/custom/override set, a missing
+# property does not fall back to the shipped default.
+#
+sync_owned()
+{
+	local __id __en __base __def __cmd __bound __path
+	local __got __prop __val __suffix
+
+	# id, enable, bound, base, default, command: a listen 0 row
+	# joined with its "# xfconf path command" comment
+	scan_dirs "$ROWS"
+	awk -F '\t' '
+		NR == FNR {
+			path = $2
+			sub(/ .*/, "", path)
+			cmd = $2
+			sub(/^[^ ]+ */, "", cmd)
+			if (path ~ /^\/commands\/custom\/./)
+				base = "/commands/custom"
+			else if (path ~ /^\/xfwm4\/custom\/./)
+				base = "/xfwm4/custom"
+			else
+				next
+			if (cmd == "")
+				next
+			def = substr(path, length(base) + 2)
+			meta[$1] = base "\t" def "\t" cmd
+			next
+		}
+		$2 == 0 && ($1 in meta) {
+			print $1 "\t" $3 "\t" $4 "\t" meta[$1]
+		}
+	' "$ROWS" "$RAWK" > "$ROWS2"
+	mv -f "$ROWS2" "$ROWS"
+	:> "$KEEP"
+	while IFS='	' read -r __id __en __bound __base __def __cmd; do
+		[ "$__id" ] || continue
+		[ "$__en" = 1 ] || continue
+		printf '%s\n' "$__base/$__bound" >> "$KEEP"
+	done < "$ROWS"
+	state_path state
+	:> "$ROWS2"
+	while IFS='	' read -r __id __en __bound __base __def __cmd; do
+		[ "$__id" ] || continue
+		__path="$__base/$__bound"
+		__defpath="$__base/$__def"
+		__old=
+		if [ "$state" ] && [ -f "$state" ]; then
+			while IFS='	' read -r __sid __sacc __scmd; do
+				[ "$__sid" = "$__id" ] || continue
+				__old="$__sacc"
+				break
+			done < "$state"
+		fi
+		if [ "$__en" = 1 ]; then
+			prop_get "$__path" __got
+			case "$__got" in
+			__missing__|"") prop_set "$__path" "$__cmd" ;;
+			"$__cmd") : ok ;;
+			*)
+				[ "$__old" ] && printf '%s\t%s\t%s\n' \
+					"$__id" "$__old" "$__cmd" >> "$ROWS2"
+				continue
+			esac
+			[ "$__defpath" = "$__path" ] ||
+				clear_ours "$__defpath" "$__cmd"
+			if [ "$__old" ] && [ "$__old" != "$__path" ]; then
+				clear_ours "$__old" "$__cmd"
+			fi
+			printf '%s\t%s\t%s\n' "$__id" "$__path" "$__cmd" >> "$ROWS2"
+		else
+			clear_ours "$__path" "$__cmd"
+			[ "$__defpath" = "$__path" ] ||
+				clear_ours "$__defpath" "$__cmd"
+			if [ "$__old" ] && [ "$__old" != "$__path" ] &&
+			   [ "$__old" != "$__defpath" ]
+			then
+				clear_ours "$__old" "$__cmd"
+			fi
+		fi
+	done < "$ROWS"
+	if [ "$state" ]; then
+		mkdir -p "${state%/*}"
+		mv -f "$ROWS2" "$state"
+	fi
+}
+
+keep_has()
+{
+	local __p="$1"
+	local __line
+
+	while read -r __line; do
+		[ "$__line" = "$__p" ] && return 0
+	done < "$KEEP"
+	return 1
+}
+
+clear_ours()
+{
+	local __path="$1" __cmd="$2"
+	local __got
+
+	keep_has "$__path" && return 0
+	prop_get "$__path" __got
+	case "$__got" in
+	"$__cmd"|"") prop_reset "$__path" ;;
+	*) : keep
+	esac
+}
+
+############################################################ MAIN
+
+bh_resolve || exit 0
+case "$1" in
+--wait) apply_wait xfce_up || exit 0 ;;
+*) xfce_up || exit 0
+esac
+
+WANT=$( mktemp )
+HAVE=$( mktemp )
+RAWP=$( mktemp )
+ROWS=$( mktemp )
+ROWS2=$( mktemp )
+KEEP=$( mktemp )
+RAWK=$( mktemp )
+rawv=$( mktemp )
+trap 'rm -f "$WANT" "$HAVE" "$RAWP" "$ROWS" "$ROWS2" "$KEEP" "$RAWK" \
+	"$rawv"' EXIT
+"$BH" --print-keys "$bh_wm" > "$RAWK" || exit 0
+xfconf-query -c "$channel" -l -v > "$rawv" || exit 0
+awk '
+	NF < 1 { next }
+	$1 !~ /^\// { next }
+	{
+		prop = $1
+		$1 = ""
+		sub(/^[[:space:]]+/, "")
+		printf "%s\t%s\n", prop, $0
+	}
+' "$rawv" > "$HAVE" || exit 0
+:> "$WANT"
+while IFS='	' read -r id listen en acc label; do
+	[ "$id" ] || continue
+	[ "$listen" = 1 ] || continue
+	[ "$en" = 1 ] || continue
+	norm_of "$acc" nr || continue
+	want_has "$nr" && continue
+	printf '%s\t%s\n' "$nr" "$acc" >> "$WANT"
+done < "$RAWK"
+drop_stale
+set_free
+sync_owned
+
+################################################################################
+# END
+################################################################################

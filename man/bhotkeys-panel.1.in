@@ -1,0 +1,83 @@
+.\" Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd October 1, 2026
+.Dt BHOTKEYS-PANEL 1
+.Os
+.Sh NAME
+.Nm bhotkeys-panel
+.Nd chord list/editor for bhotkeys
+.Sh SYNOPSIS
+.Nm
+.Op Fl Fl greeter
+.Op Bro Fl Fl enable | Fl Fl disable Brc
+.Sh DESCRIPTION
+.Nm
+shows each chord and edits whether it is on and what key runs it.
+.Pp
+With
+.Fl Fl greeter
+the list is read-only until the greeter unlock password is entered.
+Combined with
+.Fl Fl enable
+or
+.Fl Fl disable ,
+.Fl Fl greeter
+changes the greeter file instead of the session file.
+That write requires the super-user.
+.Pp
+.Fl Fl disable
+writes the session file so that neither the Panel chord nor the
+Panel alt chord opens the list, and closes a list that is already
+open.
+No chord then opens the list, so a user cannot change chords or
+turn them back on from the list.
+It does not open the list.
+Other lines in the file are left as they are.
+.Pp
+.Fl Fl enable
+writes the session file so that the Panel chord and the Panel alt
+chord open the list again.
+It does not open the list.
+Other lines in the file are left as they are.
+.Pp
+An unrecognized option prints the usage and exits non-zero.
+.Pp
+See
+.Xr bhotkeys 1
+for the list, the plugin file format, and the chords.
+.Sh FILES
+.Bl -tag -width "@PREFIX@/share/bhotkeys/plugins.d"
+.It Pa @PREFIX@/share/bhotkeys/plugins.d
+First directory of chord files.
+.It Pa ~/share/bhotkeys/plugins.d
+Second directory of chord files.
+A file here replaces a system file with the same
+.Li id .
+.It Pa $BHOTKEYS_PLUGINS
+Extra directory of chord files, scanned last.
+A file here replaces the same
+.Li id
+from either directory above.
+.It Pa ~/.config/bhotkeys/session
+Saved checks, chords, and whether a chord opens the list.
+When
+.Ev XDG_CONFIG_HOME
+is set, this file is
+.Pa $XDG_CONFIG_HOME/bhotkeys/session .
+.It Pa ~/.config/bhotkeys/panel-ui
+Saved sort and scroll.
+Not read at the greeter.
+.It Pa @PREFIX@/etc/bhotkeys/greeter
+Greeter checks and chords. Lines have no window manager name.
+.It Pa @PREFIX@/etc/bhotkeys.passwd
+Greeter unlock hash.
+See
+.Xr bhotkeys-passwd 1 .
+.El
+.Sh SEE ALSO
+.Xr bhotkeys 1 ,
+.Xr bhotkeys-passwd 1
+.Sh AUTHORS
+.An Devin Teske Aq Mt dteske@FreeBSD.org

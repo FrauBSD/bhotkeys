@@ -1,0 +1,9 @@
+bhotkeys
+bhotkeys-panel
+bhotkeys-passwd
+bin/bhotkeys-start
+man/bhotkeys.1
+man/bhotkeys-panel.1
+man/bhotkeys-passwd.1
+man/bhotkeys-start.1
+*.o

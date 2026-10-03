@@ -1,0 +1,82 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Plugin comment reader for apply scripts $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# A "# $bh_tag" comment names the window manager's own setting for a
+# listen 0 plugin. The listener skips comments, so the apply script
+# reads them here. scan_dirs prints the id and that comment's text
+# for every plugin; a later directory replaces the same id when the
+# caller keeps the last row. bh_wm names the window manager.
+#
+############################################################ CONFIG
+
+case "$0" in
+*.subr) exit 0 ;;
+esac
+
+############################################################ FUNCTIONS
+
+state_path()
+{
+	local __var_to_set="$1"
+	local __p
+
+	if [ "${XDG_CONFIG_HOME-}" ]; then
+		__p="$XDG_CONFIG_HOME/bhotkeys/${bh_wm}-applied"
+	elif [ "${HOME-}" ]; then
+		__p="$HOME/.config/bhotkeys/${bh_wm}-applied"
+	else
+		__p=
+	fi
+	eval $__var_to_set=\"\$__p\"
+}
+
+scan_plugin()
+{
+	local __file="$1"
+	local __id= __rest= __line
+
+	while IFS= read -r __line; do
+		case "$__line" in
+		'id '*) __id="${__line#id }" ;;
+		"# $bh_tag "*) __rest="${__line#"# $bh_tag "}" ;;
+		*) : ok
+		esac
+	done < "$__file"
+	[ "$__id" ] || return 1
+	[ "$__rest" ] || return 1
+	printf '%s\t%s\n' "$__id" "$__rest"
+}
+
+scan_dirs()
+{
+	local __out="$1"
+	local __dir __f
+
+	:> "$__out"
+	for __dir in /usr/local/share/bhotkeys/plugins.d \
+		${HOME:+$HOME/share/bhotkeys/plugins.d} \
+		${BHOTKEYS_PLUGINS:+$BHOTKEYS_PLUGINS} \
+	; do
+		[ -d "$__dir" ] || continue
+		for __f in "$__dir"/*; do
+			[ -f "$__f" ] || continue
+			scan_plugin "$__f" >> "$__out" || : plugin
+		done
+	done
+}
+
+################################################################################
+# END
+################################################################################

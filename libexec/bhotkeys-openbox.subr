@@ -1,0 +1,108 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Openbox rc.xml writer for apply scripts $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Shared rc.xml grab writer. The caller sets bh_wm and rc_file and
+# seeds the file. bhotkeys-seq.subr is already loaded.
+#
+############################################################ CONFIG
+
+case "$0" in
+*.subr) exit 0 ;;
+esac
+
+############################################################ GLOBALS
+
+begin='<!-- bhotkeys -->'
+end='<!-- /bhotkeys -->'
+anchor='^[[:space:]]*</keyboard>[[:space:]]*$'
+
+############################################################ FUNCTIONS
+
+ob_taken()
+{
+	awk '
+		function trim(s) {
+			sub(/^[ \t]+/, "", s)
+			sub(/[ \t]+$/, "", s)
+			return s
+		}
+		{
+			t = trim($0)
+		}
+		t == "<!-- bhotkeys -->" { skip = 1; next }
+		t == "<!-- /bhotkeys -->" { skip = 0; next }
+		skip { next }
+		{
+			line = $0
+			while (match(line, /key="[^"]*"/)) {
+				s = substr(line, RSTART, RLENGTH)
+				sub(/^key="/, "", s)
+				sub(/"$/, "", s)
+				print s
+				line = substr(line, RSTART + RLENGTH)
+			}
+		}
+	' "$1"
+}
+
+emit_block()
+{
+	local __chords="$1" __taken="$2" __id __key
+
+	printf '%s\n' "$begin"
+	while IFS='	' read -r __id __key; do
+		[ "$__id" ] || continue
+		quietly grep -F -x "$__key" "$__taken" &&
+			continue
+		quietly grep -F -x "$__key" "$seen" &&
+			continue
+		printf '%s\n' "$__key" >> "$seen"
+		printf '%s\n' "  <keybind key=\"$__key\">"
+		printf '%s\n' "    <action name=\"Execute\">"
+		printf '%s\n' "      <command>/usr/bin/true</command>"
+		printf '%s\n' "    </action>"
+		printf '%s\n' "  </keybind>"
+	done < "$__chords"
+	printf '%s\n' "$end"
+}
+
+ob_apply()
+{
+	local __chords __taken __body __seen
+
+	[ -f "$rc_file" ] || exit 0
+	__chords=$( mktemp ) || exit 0
+	__taken=$( mktemp ) || exit 0
+	__body=$( mktemp ) || exit 0
+	__seen=$( mktemp ) || exit 0
+	seen="$__seen"
+	trap 'rm -f "$__chords" "$__taken" "$__body" "$__seen"' EXIT
+	chord_file "$__chords" || exit 0
+	ob_taken "$rc_file" > "$__taken"
+	emit_block "$__chords" "$__taken" > "$__body"
+	if has_line "$rc_file" "$begin"; then
+		replace_region "$rc_file" "$begin" "$end" "$__body" ||
+			exit 0
+	else
+		insert_before "$rc_file" "$anchor" "$__body" || exit 0
+	fi
+	if [ "$region_changed" ]; then
+		quietly openbox --reconfigure || : reconfigure failed
+	fi
+}
+
+################################################################################
+# END
+################################################################################

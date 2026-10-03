@@ -1,0 +1,115 @@
+.\" Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd October 3, 2026
+.Dt BHOTKEYS-START 1
+.Os
+.Sh NAME
+.Nm bhotkeys-start
+.Nd start bhotkeys for an X session
+.Sh SYNOPSIS
+.Nm
+.Op Fl Fl no-bosd
+.Op Ar manager
+.Sh DESCRIPTION
+.Nm
+is the one line a session script needs to bring up
+.Xr bhotkeys 1 .
+It does three things, in order.
+.Bl -enum
+.It
+Runs
+.Xr bosd-start 1
+when it is on
+.Ev PATH ,
+so the plugins that paint a gauge or a caption find a daemon.
+.Fl Fl no-bosd
+skips this step, for a session whose plugins do not use
+.Xr bosd 1
+or where something else starts it.
+A failure here is reported by
+.Nm bosd-start
+and does not stop the rest.
+.It
+Starts the session listener,
+.Nm bhotkeys Fl Fl daemon ,
+in the background.
+With
+.Ar manager ,
+the listener is told
+.Fl Fl wm Ar manager
+and does not wait to detect one.
+Without it, the listener detects the manager itself, waiting up
+to 30 seconds for one it knows.
+.It
+With
+.Ar manager ,
+runs that manager's apply script,
+.Pa @PREFIX@/libexec/bhotkeys/bhotkeys- Ns Ar manager Ns Pa -apply ,
+in the background with
+.Fl Fl wait .
+The script polls for the manager once a second for up to 30 seconds,
+then registers the listener's chords with it so the focused client
+does not see them.
+A manager with no apply script is simply not applied.
+.El
+.Pp
+.Ar manager
+is a name
+.Xr bhotkeys 1
+accepts for
+.Fl Fl wm .
+.Pp
+The listener keeps one instance per user.
+When one is already running,
+.Nm
+leaves it alone and the new one exits.
+.Nm bhotkeys
+is taken from the directory
+.Nm
+runs from when it is there, and from
+.Ev PATH
+otherwise.
+The apply script is taken from that same directory when it is
+there, and from
+.Pa @PREFIX@/libexec/bhotkeys
+otherwise.
+.Pp
+A
+.Pa ~/.xsession
+for MATE:
+.Bd -literal -offset indent
+if [ ! "$DBUS_SESSION_BUS_ADDRESS" ]; then
+	eval "$( dbus-launch --sh-syntax --exit-with-session )"
+fi
+bhotkeys-start mate
+exec mate-session
+.Ed
+.Pp
+The bus lines stay in the session script.
+A child cannot export the address into the shell that runs the
+session, and the apply scripts for the GNOME family need it.
+.Sh ENVIRONMENT
+.Bl -tag -width "DISPLAY"
+.It Ev DISPLAY
+X server to watch.
+The default is
+.Pa :0 .
+.El
+.Sh FILES
+.Bl -tag -width "@PREFIX@/libexec/bhotkeys/" -compact
+.It Pa @PREFIX@/libexec/bhotkeys/
+The apply scripts.
+.El
+.Sh EXIT STATUS
+.Nm
+exits 1 when
+.Nm bhotkeys
+is not found or the arguments are wrong, and 0 otherwise.
+.Sh SEE ALSO
+.Xr bhotkeys 1 ,
+.Xr bosd 1 ,
+.Xr bosd-start 1
+.Sh AUTHORS
+.An Devin Teske Aq Mt dteske@FreeBSD.org

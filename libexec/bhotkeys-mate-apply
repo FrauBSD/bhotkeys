@@ -1,0 +1,416 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Register listener chords with MATE $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Register bhotkeys chords with MATE so the focused client does not
+# see them. Each new chord is a custom shortcut that runs true.
+# A sequence MATE already owns is left alone.
+#
+# listen 0 rows name a gsettings key in a "# mate" comment.
+# bhotkeys --print-keys mate supplies each row's chord and enable,
+# with <Mod4> for Super. The key holds one accelerator. That
+# accelerator is set or cleared.
+#
+############################################################ GLOBALS
+
+pgm="${0##*/}" # Program basename
+
+mark=/usr/bin/true
+custom_schema=org.mate.control-center.keybinding
+custom_base=/org/mate/desktop/keybindings/
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+
+plug_lib="${0%/*}/bhotkeys-plugin.subr"
+[ -f "$plug_lib" ] || plug_lib="${0%/*}/../../bhotkeys/bhotkeys-plugin.subr"
+[ -f "$plug_lib" ] || plug_lib=/usr/local/bhotkeys/bhotkeys-plugin.subr
+[ -f "$plug_lib" ] || exit 0
+. "$plug_lib"
+bh_wm=mate
+bh_tag=mate
+
+############################################################ FUNCTIONS
+
+norm_of()
+{
+	local __rest="$1" __var_to_set="$2"
+	local __ctrl __alt __shift __super
+	local __key __mods __out
+
+	__ctrl=
+	__alt=
+	__shift=
+	__super=
+	while :; do
+		case "$__rest" in
+		'<Super>'*)
+			__super=1
+			__rest="${__rest#<Super>}"
+			;;
+		'<Mod4>'*)
+			__super=1
+			__rest="${__rest#<Mod4>}"
+			;;
+		'<Control>'*)
+			__ctrl=1
+			__rest="${__rest#<Control>}"
+			;;
+		'<Ctrl>'*)
+			__ctrl=1
+			__rest="${__rest#<Ctrl>}"
+			;;
+		'<Primary>'*)
+			__ctrl=1
+			__rest="${__rest#<Primary>}"
+			;;
+		'<Alt>'*)
+			__alt=1
+			__rest="${__rest#<Alt>}"
+			;;
+		'<Shift>'*)
+			__shift=1
+			__rest="${__rest#<Shift>}"
+			;;
+		*) break
+		esac
+	done
+	[ "$__rest" ] || return 1
+	lower1 "$__rest" __key
+	__mods=
+	[ "$__ctrl" ] && __mods="${__mods}Control,"
+	[ "$__alt" ] && __mods="${__mods}Alt,"
+	[ "$__shift" ] && __mods="${__mods}Shift,"
+	[ "$__super" ] && __mods="${__mods}Super,"
+	__mods="${__mods%,}"
+	__out="$__mods|$__key"
+	eval $__var_to_set=\"\$__out\"
+}
+
+mate_up()
+{
+	have gsettings || return 1
+	have dconf || return 1
+	proc_eq marco || return 1
+	quietly gsettings get org.mate.Marco.global-keybindings \
+		panel-run-dialog
+}
+
+gs_set()
+{
+	local __schema="$1" __key="$2" __val="$3"
+	local __got __plain
+
+	gsettings set "$__schema" "$__key" "$__val" || return 1
+	gs_get "$__schema" "$__key" __got || return 1
+	unquote "$__got" __plain
+	if [ "$__plain" = "$__val" ]; then
+		return 0
+	fi
+	# A dead DBUS_SESSION_BUS_ADDRESS makes set exit 0 and write nothing
+	unset DBUS_SESSION_BUS_ADDRESS
+	gsettings set "$__schema" "$__key" "$__val" || return 1
+	gs_get "$__schema" "$__key" __got || return 1
+	unquote "$__got" __plain
+	[ "$__plain" = "$__val" ]
+}
+
+clear_of()
+{
+	local __schema="$1" __var_to_set="$2"
+	local __tok
+
+	case "$__schema" in
+	org.mate.Marco.*) __tok=disabled ;;
+	*) __tok=
+	esac
+	eval $__var_to_set=\"\$__tok\"
+}
+
+norm_taken()
+{
+	local __norm="$1"
+	local __kind __sch __k __b
+
+	while IFS='	' read -r __kind __sch __k __b; do
+		case "$__kind" in
+		built|other) : ok ;;
+		*) continue
+		esac
+		norm_of "$__b" outnorm || continue
+		[ "$outnorm" = "$__norm" ] && return 0
+	done < "$have"
+	return 1
+}
+
+owned_elsewhere()
+{
+	local __schema="$1" __key="$2" __norm="$3"
+	local __kind __sch __k __b
+
+	while IFS='	' read -r __kind __sch __k __b; do
+		case "$__kind" in
+		built|other) : ok ;;
+		*) continue
+		esac
+		norm_of "$__b" outnorm || continue
+		[ "$outnorm" = "$__norm" ] || continue
+		[ "$__sch" = "$__schema" ] && [ "$__k" = "$__key" ] && continue
+		return 0
+	done < "$have"
+	return 1
+}
+
+have_set()
+{
+	local __schema="$1" __key="$2" __bind="$3"
+	local __kind __sch __k __b
+
+	:> "$have.new"
+	while IFS='	' read -r __kind __sch __k __b; do
+		if [ "$__sch" = "$__schema" ] && [ "$__k" = "$__key" ]; then
+			continue
+		fi
+		printf '%s\t%s\t%s\t%s\n' \
+			"$__kind" "$__sch" "$__k" "$__b" >> "$have.new"
+	done < "$have"
+	if [ "$__bind" ]; then
+		printf '%s\t%s\t%s\t%s\n' \
+			built "$__schema" "$__key" "$__bind" >> "$have.new"
+	fi
+	mv -f "$have.new" "$have"
+}
+
+load_have()
+{
+	local __schema __line __key __raw __plain __child __path __act __bind
+
+	:> "$have"
+	for __schema in \
+		org.mate.SettingsDaemon.plugins.media-keys \
+		org.mate.Marco.global-keybindings \
+		org.mate.Marco.window-keybindings \
+	; do
+		gsettings list-recursively "$__schema" |
+		while IFS= read -r __line; do
+			__key="${__line#* }"
+			__key="${__key%% *}"
+			__raw="${__line#* }"
+			__raw="${__raw#* }"
+			case "$__raw" in
+			\'*\') : ok ;;
+			*) continue
+			esac
+			unquote "$__raw" __plain
+			case "$__plain" in
+			''|disabled) continue ;;
+			esac
+			printf '%s\t%s\t%s\t%s\n' built "$__schema" "$__key" \
+				"$__plain" >> "$have"
+		done
+	done
+	dconf list "$custom_base" > "$paths" 2> /dev/null || : customs
+	while IFS= read -r __child; do
+		[ "$__child" ] || continue
+		case "$__child" in
+		*/) : ok ;;
+		*) continue
+		esac
+		__path="$custom_base$__child"
+		gs_get "$custom_schema:$__path" action __act || __act=
+		gs_get "$custom_schema:$__path" binding __bind || __bind=
+		unquote "$__act" __plain
+		__act="$__plain"
+		unquote "$__bind" __plain
+		__bind="$__plain"
+		[ "$__bind" ] || continue
+		case "$__bind" in
+		disabled) continue ;;
+		esac
+		if [ "$__act" = "$mark" ]; then
+			printf '%s\t%s\t%s\t%s\n' \
+				true custom "$__path" "$__bind" >> "$have"
+		else
+			printf '%s\t%s\t%s\t%s\n' \
+				other custom "$__path" "$__bind" >> "$have"
+		fi
+	done < "$paths"
+}
+
+sync_owned()
+{
+	local __id __en __schema __key __def __bound __norm
+	local __raw __plain __curn __defnorm __old __oldn __sid __sbind
+	local __sch __sk __clr __hit
+
+	# id, enable, bound, schema, key, default: a listen 0 row
+	# joined with its "# mate schema key default" comment
+	scan_dirs "$rows"
+	awk -F '\t' '
+		NR == FNR {
+			n = split($2, w, " ")
+			def = $2
+			sub(/^[^ ]+ [^ ]+ /, "", def)
+			if (n >= 3)
+				meta[$1] = w[1] "\t" w[2] "\t" def
+			next
+		}
+		$2 == 0 && ($1 in meta) {
+			print $1 "\t" $3 "\t" $4 "\t" meta[$1]
+		}
+	' "$rows" "$rawk" > "$rows2"
+	mv -f "$rows2" "$rows"
+	state_path state
+	:> "$rows2"
+	while IFS='	' read -r __id __en __bound __schema __key __def; do
+		[ "$__id" ] || continue
+		norm_of "$__bound" outnorm || continue
+		__norm="$outnorm"
+		__old=
+		if [ "$state" ] && [ -f "$state" ]; then
+			while IFS='	' read -r __sid __sch __sk __sbind; do
+				[ "$__sid" = "$__id" ] || continue
+				__old="$__sbind"
+				break
+			done < "$state"
+		fi
+		gs_get "$__schema" "$__key" __raw || continue
+		unquote "$__raw" __plain
+		case "$__plain" in
+		''|disabled) __curn= ;;
+		*) norm_of "$__plain" outnorm && __curn="$outnorm" || __curn=
+		esac
+		if [ "$__en" = 1 ]; then
+			if owned_elsewhere "$__schema" "$__key" "$__norm"; then
+				if [ "$__old" ]; then
+					printf '%s\t%s\t%s\t%s\n' \
+						"$__id" "$__schema" "$__key" \
+						"$__old" >> "$rows2"
+				fi
+				continue
+			fi
+			if [ "$__curn" = "$__norm" ]; then
+				printf '%s\t%s\t%s\t%s\n' "$__id" "$__schema" \
+					"$__key" "$__bound" >> "$rows2"
+				continue
+			fi
+			gs_set "$__schema" "$__key" "$__bound" || continue
+			have_set "$__schema" "$__key" "$__bound"
+			printf '%s\t%s\t%s\t%s\n' "$__id" "$__schema" \
+				"$__key" "$__bound" >> "$rows2"
+		else
+			__hit=
+			[ "$__curn" = "$__norm" ] && __hit=1
+			norm_of "$__def" outnorm && __defnorm="$outnorm" ||
+				__defnorm=
+			[ "$__defnorm" ] && [ "$__curn" = "$__defnorm" ] &&
+				__hit=1
+			__oldn=
+			if [ "$__old" ]; then
+				norm_of "$__old" outnorm && __oldn="$outnorm"
+			fi
+			[ "$__oldn" ] && [ "$__curn" = "$__oldn" ] && __hit=1
+			[ "$__hit" ] || continue
+			clear_of "$__schema" __clr
+			if [ "$__plain" = "$__clr" ]; then
+				continue
+			fi
+			gs_set "$__schema" "$__key" "$__clr" || continue
+			have_set "$__schema" "$__key" ""
+		fi
+	done < "$rows"
+	if [ "$state" ]; then
+		mkdir -p "${state%/*}"
+		mv -f "$rows2" "$state"
+	fi
+}
+
+swallow()
+{
+	local __id __listen __en __bind __label __norm __path __kind __sch
+	local __k __b __child __keep
+
+	:> "$want"
+	while IFS='	' read -r __id __listen __en __bind __label; do
+		[ "$__id" ] || continue
+		[ "$__listen" = 1 ] || continue
+		[ "$__en" = 1 ] || continue
+		case "$__id" in
+		*[!A-Za-z0-9_-]*) continue ;;
+		esac
+		norm_of "$__bind" outnorm || continue
+		printf '%s\t%s\t%s\t%s\n' \
+			"$__id" "$__bind" "$outnorm" "$__label" >> "$want"
+	done < "$rawk"
+	:> "$final"
+	while IFS='	' read -r __id __bind __norm __label; do
+		norm_taken "$__norm" && continue
+		__path="${custom_base}bhotkeys-$__id/"
+		__keep=
+		while IFS='	' read -r __kind __sch __k __b; do
+			[ "$__kind" = true ] || continue
+			[ "$__k" = "$__path" ] || continue
+			[ "$__b" = "$__bind" ] && __keep=1
+		done < "$have"
+		if [ ! "$__keep" ]; then
+			gs_set "$custom_schema:$__path" name \
+				"bhotkeys: $__label" || continue
+			gs_set "$custom_schema:$__path" action "$mark" ||
+				continue
+			gs_set "$custom_schema:$__path" binding "$__bind" ||
+				continue
+		fi
+		printf '%s\n' "$__path" >> "$final"
+	done < "$want"
+	while IFS= read -r __child; do
+		[ "$__child" ] || continue
+		case "$__child" in
+		bhotkeys-*/) : ok ;;
+		*) continue
+		esac
+		__path="$custom_base$__child"
+		quietly grep -F -x "$__path" "$final" && continue
+		quietly dconf reset -f "$__path" || : reset
+	done < "$paths"
+}
+
+############################################################ MAIN
+
+bh_resolve || exit 0
+bus_ok
+case "$1" in
+--wait) apply_wait mate_up || exit 0 ;;
+*) mate_up || exit 0
+esac
+
+want=$( mktemp )
+have=$( mktemp )
+paths=$( mktemp )
+final=$( mktemp )
+rawk=$( mktemp )
+rows=$( mktemp )
+rows2=$( mktemp )
+trap 'rm -f "$want" "$have" "$paths" "$final" "$rawk" "$rows" "$rows2" \
+	"$have.new"' EXIT
+"$BH" --print-keys "$bh_wm" > "$rawk" || exit 0
+load_have
+swallow
+sync_owned
+
+################################################################################
+# END
+################################################################################

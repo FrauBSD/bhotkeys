@@ -1,0 +1,55 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Push listen-0 chords into fvwm $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Push listen-0 chords into the running fvwm. bhotkeys does not listen for
+# these; fvwm does. Missing MFL is not an error.
+#
+############################################################ GLOBALS
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+
+############################################################ FUNCTIONS
+
+fvwm_up()
+{
+	proc_eq fvwm || proc_eq fvwm2 || proc_eq fvwm3
+}
+
+############################################################ MAIN
+
+case "$1" in
+--wait) apply_wait fvwm_up || exit 0 ;;
+*) fvwm_up || exit 0
+esac
+
+bh_resolve || exit 0
+have FvwmCommand || exit 0
+
+sock="${FVWMMFL_SOCKET:-/tmp/fvwmmfl/fvwm_mfl_:0.sock}"
+[ -S "$sock" ] || exit 0
+
+"$BH" --print-keys fvwm |
+	while IFS= read -r line; do
+		[ "$line" ] || continue
+		quietly FvwmCommand -f "$sock" "$line" || : errors ignored
+	done
+
+################################################################################
+# END
+################################################################################

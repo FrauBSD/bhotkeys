@@ -1,0 +1,108 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Start bhotkeys for an X session $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# One line for ~/.xsession or a window manager rc. Starts bosd through
+# bosd-start unless --no-bosd is given, starts the session listener,
+# and when a window manager is named, registers the listener's chords
+# with it once it is up.
+#
+# The listener keeps one instance per user. A listener already
+# running is left alone.
+#
+############################################################ GLOBALS
+
+pgm="${0##*/}" # Program basename
+
+case "$0" in
+*/*) here="${0%/*}" ;;
+*) here=$( command -v "$0" ) && here="${here%/*}" || here=.
+esac
+bosd=1
+wm=
+
+############################################################ FUNCTIONS
+
+quietly() { "$@" > /dev/null 2>&1; }
+have() { quietly command -v "$@"; }
+
+usage()
+{
+	echo "Usage: $pgm [--no-bosd] [manager]" >&2
+	exit 1
+}
+
+# Program next to this script first, so an overlay stays together
+find_bin()
+{
+	local __name="$1" __var_to_set="$2"
+	local __path
+
+	if [ -x "$here/$__name" ]; then
+		__path="$here/$__name"
+	elif have "$__name"; then
+		__path="$__name"
+	else
+		return 1
+	fi
+	eval $__var_to_set=\"\$__path\"
+}
+
+find_apply()
+{
+	local __name="$1" __var_to_set="$2"
+	local __dir
+
+	for __dir in "$here" @PREFIX@/libexec/bhotkeys; do
+		[ -x "$__dir/$__name" ] || continue
+		eval $__var_to_set=\"\$__dir/\$__name\"
+		return 0
+	done
+	return 1
+}
+
+############################################################ MAIN
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--no-bosd) bosd= ;;
+	--) shift; break ;;
+	-*) usage ;;
+	*) break
+	esac
+	shift
+done
+[ $# -le 1 ] || usage
+wm="$1"
+
+export DISPLAY="${DISPLAY:-:0}"
+
+if [ "$bosd" ] && have bosd-start; then
+	bosd-start || : bosd is a plugin convenience, not a requirement
+fi
+
+find_bin bhotkeys bh || {
+	echo "$pgm: bhotkeys not found" >&2
+	exit 1
+}
+if [ "$wm" ]; then
+	"$bh" --daemon --wm "$wm" &
+	find_apply "bhotkeys-$wm-apply" apply && "$apply" --wait &
+else
+	"$bh" --daemon &
+fi
+
+################################################################################
+# END
+################################################################################

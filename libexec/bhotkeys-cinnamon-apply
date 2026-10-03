@@ -1,0 +1,188 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Grab listener chords in Cinnamon $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Grab listener chords in Cinnamon so the focused client does not
+# see them. Each new chord is a custom shortcut that runs true.
+# A sequence Cinnamon already owns is left alone. Missing cinnamon
+# is not an error.
+#
+############################################################ GLOBALS
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+bh_wm=cinnamon
+
+parent=org.cinnamon.desktop.keybindings
+custom=org.cinnamon.desktop.keybindings.custom-keybinding
+base=/org/cinnamon/desktop/keybindings/custom-keybindings/
+mark=/usr/bin/true
+
+############################################################ FUNCTIONS
+
+cinnamon_up()
+{
+	proc_eq cinnamon || proc_eq muffin || return 1
+	have gsettings || return 1
+	quietly gsettings get "$parent" custom-list
+}
+
+gs_set()
+{
+	local __schema="$1" __key="$2" __val="$3" __got __plain
+
+	gsettings set "$__schema" "$__key" "$__val" || return 1
+	__got=$( gsettings get "$__schema" "$__key" ) || return 1
+	unquote "$__got" __plain
+	[ "$__plain" = "$__val" ] && return 0
+	unset DBUS_SESSION_BUS_ADDRESS
+	gsettings set "$__schema" "$__key" "$__val" || return 1
+	__got=$( gsettings get "$__schema" "$__key" ) || return 1
+	unquote "$__got" __plain
+	[ "$__plain" = "$__val" ]
+}
+
+# 0 when some other row already has this accelerator
+owned_acc()
+{
+	local __acc="$1" __id="$2" __n1 __n2 __n3 __n4
+
+	__n1="['$__acc']"
+	__n2="['$__acc',"
+	__n3=", '$__acc']"
+	__n4=", '$__acc',"
+	awk -v n1="$__n1" -v n2="$__n2" -v n3="$__n3" -v n4="$__n4" \
+		-v id="$__id" '
+		BEGIN { found = 0 }
+		index($0, "bhotkeys-" id "/") { next }
+		index($0, n1) || index($0, n2) || index($0, n3) ||
+			index($0, n4) { found = 1 }
+		END { exit !found }
+	' "$listed"
+}
+
+# stdin is one gsettings custom-list value
+list_ids()
+{
+	awk '
+		{
+			gsub(/[\[\]'\'']/, " ")
+			gsub(/,/, " ")
+			for (i = 1; i <= NF; i++) {
+				if ($i == "@as")
+					continue
+				if ($i ~ /^[A-Za-z0-9_-]+$/)
+					print $i
+			}
+		}
+	'
+}
+
+list_value()
+{
+	local __id __n=0 __acc=
+	while read -r __id; do
+		[ "$__id" ] || continue
+		case "$__id" in
+		*[!A-Za-z0-9_-]*) continue ;;
+		esac
+		if [ "$__n" -eq 0 ]; then
+			__acc="'$__id'"
+		else
+			__acc="$__acc, '$__id'"
+		fi
+		__n=$(( $__n + 1 ))
+	done
+	if [ "$__n" -eq 0 ]; then
+		printf '%s\n' '@as []'
+	else
+		printf '%s\n' "[$__acc]"
+	fi
+}
+
+reset_id()
+{
+	local __id="$1" __path
+
+	__path="$custom:$base$__id/"
+	quietly gsettings reset "$__path" name || : reset
+	quietly gsettings reset "$__path" command || : reset
+	quietly gsettings reset "$__path" binding || : reset
+}
+
+main()
+{
+	local __chords __listed __user __keep __old __accs __cur
+	local __id __acc __path __val
+
+	case "$1" in
+	--wait) apply_wait cinnamon_up || exit 0 ;;
+	*) cinnamon_up || exit 0
+	esac
+	bus_ok
+	bh_resolve || exit 0
+	__cur=$( gsettings get "$parent" custom-list ) || exit 0
+	__chords=$( mktemp ) || exit 0
+	__listed=$( mktemp ) || exit 0
+	__user=$( mktemp ) || exit 0
+	__keep=$( mktemp ) || exit 0
+	__old=$( mktemp ) || exit 0
+	__accs=$( mktemp ) || exit 0
+	listed="$__listed"
+	keep_acc="$__accs"
+	trap 'rm -f "$__chords" "$__listed" "$__user" "$__keep" "$__old" "$__accs" "$__user.ids"' \
+		EXIT
+	chord_file "$__chords" || exit 0
+	gsettings list-recursively "$parent" > "$__listed" || exit 0
+	printf '%s\n' "$__cur" | list_ids > "$__user.ids"
+	while read -r __id; do
+		case "$__id" in
+		bhotkeys-*) printf '%s\n' "$__id" >> "$__old" ;;
+		*) printf '%s\n' "$__id" >> "$__user"
+		esac
+	done < "$__user.ids"
+	rm -f "$__user.ids"
+	while IFS='	' read -r __id __acc; do
+		[ "$__id" ] || continue
+		owned_acc "$__acc" "$__id" && continue
+		quietly grep -F -x "$__acc" "$keep_acc" &&
+			continue
+		__path="$custom:${base}bhotkeys-$__id/"
+		gs_set "$__path" name "bhotkeys" || continue
+		gs_set "$__path" command "$mark" || continue
+		gs_set "$__path" binding "['$__acc']" || continue
+		printf '%s\n' "bhotkeys-$__id" >> "$__keep"
+		printf '%s\n' "$__acc" >> "$keep_acc"
+	done < "$__chords"
+	__val=$( cat "$__user" "$__keep" | awk '
+		$0 ~ /^[A-Za-z0-9_-]+$/ && !seen[$0]++ { print }
+	' | list_value )
+	gs_set "$parent" custom-list "$__val" || exit 0
+	while read -r __id; do
+		[ "$__id" ] || continue
+		quietly grep -F -x "$__id" "$__keep" && continue
+		reset_id "$__id"
+	done < "$__old"
+}
+
+case "$0" in
+*bhotkeys-cinnamon-apply) main "$@" ;;
+esac
+
+################################################################################
+# END
+################################################################################

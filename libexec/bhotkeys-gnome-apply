@@ -1,0 +1,500 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Register listener chords with GNOME $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Register bhotkeys chords with GNOME so the focused client does not
+# see them. Each new chord is a custom shortcut that runs true.
+# A sequence GNOME already owns is left alone.
+#
+# listen 0 rows name a gsettings key in a "# gsettings" comment.
+# bhotkeys --print-keys gnome supplies each row's chord and enable.
+# One accelerator is added or removed. The action's other keys stay.
+#
+############################################################ GLOBALS
+
+pgm="${0##*/}" # Program basename
+
+mark=/usr/bin/true
+
+media_schema=org.gnome.settings-daemon.plugins.media-keys
+custom_schema=org.gnome.settings-daemon.plugins.media-keys.custom-keybinding
+custom_base=/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+
+plug_lib="${0%/*}/bhotkeys-plugin.subr"
+[ -f "$plug_lib" ] || plug_lib="${0%/*}/../../bhotkeys/bhotkeys-plugin.subr"
+[ -f "$plug_lib" ] || plug_lib=/usr/local/bhotkeys/bhotkeys-plugin.subr
+[ -f "$plug_lib" ] || exit 0
+. "$plug_lib"
+bh_wm=gnome
+bh_tag=gsettings
+
+############################################################ FUNCTIONS
+
+norm_of()
+{
+	local __var_to_set="$2" __rest="$1"
+	local __ctrl= __alt= __shift= __super=
+	local __key __mods __out
+
+	while :; do
+		case "$__rest" in
+		'<Super>'*)
+			__super=1
+			__rest="${__rest#<Super>}"
+			;;
+		'<Control>'*)
+			__ctrl="1"
+			__rest="${__rest#<Control>}"
+			;;
+		'<Ctrl>'*)
+			__ctrl="1"
+			__rest="${__rest#<Ctrl>}"
+			;;
+		'<Primary>'*)
+			__ctrl=1
+			__rest="${__rest#<Primary>}"
+			;;
+		'<Alt>'*)
+			__alt=1
+			__rest="${__rest#<Alt>}"
+			;;
+		'<Shift>'*)
+			__shift=1
+			__rest="${__rest#<Shift>}"
+			;;
+		*) break
+		esac
+	done
+	[ "$__rest" ] || return 1
+	lower1 "$__rest" __key
+	__mods=
+	[ "$__ctrl" ] && __mods="${__mods}Control,"
+	[ "$__alt" ] && __mods="${__mods}Alt,"
+	[ "$__shift" ] && __mods="${__mods}Shift,"
+	[ "$__super" ] && __mods="${__mods}Super,"
+	__mods="${__mods%,}"
+	__out="$__mods|$__key"
+	eval $__var_to_set=\"\$__out\"
+}
+
+gnome_up()
+{
+	have gsettings || return 1
+	proc_eq gnome-shell || return 1
+	quietly gsettings get org.gnome.mutter.keybindings switch-monitor
+}
+
+gs_set()
+{
+	gsettings set "$1" "$2" "$3"
+}
+
+# gsd re-reads foo-static when foo itself changes; touch foo and put it back
+nudge_base()
+{
+	local __schema="$1" __key="$2"
+	local __base __cur
+
+	case "$__key" in
+	*-static) __base="${__key%-static}" ;;
+	*) return 0
+	esac
+	gs_get "$__schema" "$__base" __cur || return 0
+	if [ "$__cur" = "@as []" ]; then
+		gs_set "$__schema" "$__base" "['']" || return 0
+		gs_set "$__schema" "$__base" "@as []" || return 0
+	else
+		gs_set "$__schema" "$__base" "@as []" || return 0
+		gs_set "$__schema" "$__base" "$__cur" || return 0
+	fi
+}
+
+binds_of()
+{
+	local __raw="$1" __file="$2"
+	local __rest __one
+
+	:> "$__file"
+	case "$__raw" in
+	'@as []') return 0 ;;
+	'['*) : ok ;;
+	*) return 1
+	esac
+	__rest="${__raw#\[}"
+	__rest="${__rest%\]}"
+	while [ "$__rest" ]; do
+		case "$__rest" in
+		\'*) __rest="${__rest#\'}" ;;
+		*) return 1
+		esac
+		__one="${__rest%%\'*}"
+		__rest="${__rest#*\'}"
+		case "$__rest" in
+		', '*) __rest="${__rest#, }" ;;
+		','*) __rest="${__rest#,}" ;;
+		*) : ok
+		esac
+		printf '%s\n' "$__one" >> "$__file"
+	done
+}
+
+join_binds()
+{
+	local __file="$1" __var_to_set="$2"
+	local __out='@as []' __any= __sep= __b
+
+	while IFS= read -r __b; do
+		__any=1
+		if [ ! "$__sep" ]; then
+			__out="['$__b'"
+			__sep=1
+		else
+			__out="$__out, '$__b'"
+		fi
+	done < "$__file"
+	if [ "$__any" ]; then
+		__out="$__out]"
+	fi
+	eval $__var_to_set=\"\$__out\"
+}
+
+list_has_norm()
+{
+	local __file="$1" __norm="$2"
+	local __b
+
+	while IFS= read -r __b; do
+		[ "$__b" ] || continue
+		norm_of "$__b" outnorm || continue
+		[ "$outnorm" = "$__norm" ] && return 0
+	done < "$__file"
+	return 1
+}
+
+list_del_norm()
+{
+	local __file="$1" __norm="$2"
+	local __b __n
+
+	:> "$__file.del"
+	while IFS= read -r __b; do
+		__n=
+		[ "$__b" ] && norm_of "$__b" outnorm && __n="$outnorm"
+		[ "$__n" = "$__norm" ] && continue
+		printf '%s\n' "$__b" >> "$__file.del"
+	done < "$__file"
+	mv -f "$__file.del" "$__file"
+}
+
+list_add()
+{
+	local __file="$1" __bind="$2"
+	local __norm
+
+	norm_of "$__bind" outnorm || return 1
+	__norm="$outnorm"
+	list_has_norm "$__file" "$__norm" && return 0
+	printf '%s\n' "$__bind" >> "$__file"
+}
+
+norm_taken()
+{
+	local __norm="$1"
+	local __kind __sch __k __b
+
+	while IFS='	' read -r __kind __sch __k __b; do
+		case "$__kind" in
+		built|other) : ok ;;
+		*) continue
+		esac
+		norm_of "$__b" outnorm || continue
+		[ "$outnorm" = "$__norm" ] && return 0
+	done < "$HAVE"
+	return 1
+}
+
+owned_elsewhere()
+{
+	local __schema="$1" __key="$2" __norm="$3"
+	local __kind __sch __k __b
+
+	while IFS='	' read -r __kind __sch __k __b; do
+		case "$__kind" in
+		built|other) : ok ;;
+		*) continue
+		esac
+		norm_of "$__b" outnorm || continue
+		[ "$outnorm" = "$__norm" ] || continue
+		[ "$__sch" = "$__schema" ] && [ "$__k" = "$__key" ] && continue
+		return 0
+	done < "$HAVE"
+	return 1
+}
+
+have_replace()
+{
+	local __schema="$1" __key="$2" __file="$3"
+	local __kind __sch __k __b
+
+	:> "$HAVE.new"
+	while IFS='	' read -r __kind __sch __k __b; do
+		if [ "$__sch" = "$__schema" ] && [ "$__k" = "$__key" ]; then
+			continue
+		fi
+		printf '%s\t%s\t%s\t%s\n' \
+			"$__kind" "$__sch" "$__k" "$__b" >> "$HAVE.new"
+	done < "$HAVE"
+	while IFS= read -r __b; do
+		[ "$__b" ] || continue
+		printf '%s\t%s\t%s\t%s\n' \
+			built "$__schema" "$__key" "$__b" >> "$HAVE.new"
+	done < "$__file"
+	mv -f "$HAVE.new" "$HAVE"
+}
+
+load_have()
+{
+	local __schema __key __raw __b __paths __path __cmd __bind __plain
+
+	:> "$HAVE"
+	for __schema in \
+		org.gnome.settings-daemon.plugins.media-keys \
+		org.gnome.shell.keybindings \
+		org.gnome.mutter.keybindings \
+		org.gnome.desktop.wm.keybindings \
+	; do
+		gsettings list-keys "$__schema" |
+		while IFS= read -r __key; do
+			[ "$__key" = custom-keybindings ] && continue
+			gs_get "$__schema" "$__key" __raw || continue
+			binds_of "$__raw" "$CUR" || continue
+			while IFS= read -r __b; do
+				[ "$__b" ] || continue
+				printf '%s\t%s\t%s\t%s\n' built "$__schema" \
+					"$__key" "$__b" >> "$HAVE"
+			done < "$CUR"
+		done
+	done
+	gs_get "$media_schema" custom-keybindings __paths || return 0
+	binds_of "$__paths" "$CUR" || return 0
+	while IFS= read -r __path; do
+		[ "$__path" ] || continue
+		gs_get "$custom_schema:$__path" command __cmd || __cmd=
+		gs_get "$custom_schema:$__path" binding __bind || __bind=
+		unquote "$__cmd" __plain
+		__cmd="$__plain"
+		unquote "$__bind" __plain
+		__bind="$__plain"
+		[ "$__bind" ] || continue
+		if [ "$__cmd" = "$mark" ]; then
+			printf '%s\t%s\t%s\t%s\n' true custom "$__path" \
+				"$__bind" >> "$HAVE"
+		else
+			printf '%s\t%s\t%s\t%s\n' other custom "$__path" \
+				"$__bind" >> "$HAVE"
+		fi
+	done < "$CUR"
+}
+
+sync_owned()
+{
+	local __id __en __schema __key __def __bound __norm
+	local __raw __defnorm __old __sid __sbind __sch __sk __got
+
+	# id, enable, bound, schema, key, default: a listen 0 row
+	# joined with its "# gsettings schema key default" comment
+	scan_dirs "$ROWS"
+	awk -F '\t' '
+		NR == FNR {
+			n = split($2, w, " ")
+			def = $2
+			sub(/^[^ ]+ [^ ]+ /, "", def)
+			if (n >= 3)
+				meta[$1] = w[1] "\t" w[2] "\t" def
+			next
+		}
+		$2 == 0 && ($1 in meta) {
+			print $1 "\t" $3 "\t" $4 "\t" meta[$1]
+		}
+	' "$ROWS" "$RAWK" > "$ROWS2"
+	mv -f "$ROWS2" "$ROWS"
+	state_path state
+	:> "$ROWS2"
+	while IFS='	' read -r __id __en __bound __schema __key __def; do
+		[ "$__id" ] || continue
+		norm_of "$__bound" outnorm || continue
+		__norm="$outnorm"
+		__old=
+		if [ "$state" ] && [ -f "$state" ]; then
+			while IFS='	' read -r __sid __sch __sk __sbind; do
+				[ "$__sid" = "$__id" ] || continue
+				__old="$__sbind"
+				break
+			done < "$state"
+		fi
+		gs_get "$__schema" "$__key" __raw || continue
+		binds_of "$__raw" "$CUR" || continue
+		cp -f "$CUR" "$PREV"
+		if [ "$__en" = 1 ]; then
+			if owned_elsewhere "$__schema" "$__key" "$__norm"; then
+				if [ "$__old" ]; then
+					printf '%s\t%s\t%s\t%s\n' "$__id" \
+						"$__schema" "$__key" "$__old" \
+						>> "$ROWS2"
+				fi
+				continue
+			fi
+			norm_of "$__def" outnorm && __defnorm="$outnorm" ||
+				__defnorm=
+			[ "$__defnorm" ] && [ "$__defnorm" != "$__norm" ] &&
+				list_del_norm "$CUR" "$__defnorm"
+			[ "$__old" ] && [ "$__old" != "$__bound" ] &&
+				norm_of "$__old" outnorm &&
+				list_del_norm "$CUR" "$outnorm"
+			list_add "$CUR" "$__bound" || continue
+		else
+			norm_of "$__bound" outnorm &&
+				list_del_norm "$CUR" "$outnorm"
+			norm_of "$__def" outnorm &&
+				list_del_norm "$CUR" "$outnorm"
+			if [ "$__old" ] && [ "$__old" != "$__bound" ] &&
+			   [ "$__old" != "$__def" ]
+			then
+				norm_of "$__old" outnorm &&
+					list_del_norm "$CUR" "$outnorm"
+			fi
+		fi
+		if [ "$__en" = 1 ]; then
+			if cmp -s "$CUR" "$PREV"; then
+				nudge_base "$__schema" "$__key"
+				printf '%s\t%s\t%s\t%s\n' "$__id" "$__schema" \
+					"$__key" "$__bound" >> "$ROWS2"
+				continue
+			fi
+		elif cmp -s "$CUR" "$PREV"; then
+			nudge_base "$__schema" "$__key"
+			continue
+		fi
+		join_binds "$CUR" joined || continue
+		gs_set "$__schema" "$__key" "$joined" || continue
+		nudge_base "$__schema" "$__key"
+		have_replace "$__schema" "$__key" "$CUR"
+		if [ "$__en" = 1 ]; then
+			printf '%s\t%s\t%s\t%s\n' "$__id" "$__schema" \
+				"$__key" "$__bound" >> "$ROWS2"
+		fi
+	done < "$ROWS"
+	if [ "$state" ]; then
+		mkdir -p "${state%/*}"
+		mv -f "$ROWS2" "$state"
+	fi
+}
+
+swallow()
+{
+	local __id __listen __en __bind __label __norm __path __kind __sch
+	local __k __b __cmd __plain __raw __keep
+
+	:> "$WANT"
+	while IFS='	' read -r __id __listen __en __bind __label; do
+		[ "$__id" ] || continue
+		[ "$__listen" = 1 ] || continue
+		[ "$__en" = 1 ] || continue
+		case "$__id" in
+		*[!A-Za-z0-9_-]*) continue ;;
+		esac
+		norm_of "$__bind" outnorm || continue
+		printf '%s\t%s\t%s\t%s\n' \
+			"$__id" "$__bind" "$outnorm" "$__label" >> "$WANT"
+	done < "$RAWK"
+	gs_get "$media_schema" custom-keybindings __raw || __raw='@as []'
+	binds_of "$__raw" "$PATHS" || : paths
+	:> "$FINAL"
+	while IFS= read -r __path; do
+		[ "$__path" ] || continue
+		case "$__path" in
+		*/bhotkeys-*/) continue ;;
+		esac
+		printf '%s\n' "$__path" >> "$FINAL"
+	done < "$PATHS"
+	while IFS='	' read -r __id __bind __norm __label; do
+		norm_taken "$__norm" && continue
+		__path="$custom_base/bhotkeys-$__id/"
+		__keep=
+		while IFS='	' read -r __kind __sch __k __b; do
+			[ "$__kind" = true ] || continue
+			[ "$__k" = "$__path" ] || continue
+			norm_of "$__b" outnorm || continue
+			[ "$outnorm" = "$__norm" ] && __keep=1
+		done < "$HAVE"
+		if [ ! "$__keep" ]; then
+			gs_set "$custom_schema:$__path" name \
+				"bhotkeys: $__label" || continue
+			gs_set "$custom_schema:$__path" command "$mark" ||
+				continue
+			gs_set "$custom_schema:$__path" binding "$__bind" ||
+				continue
+		fi
+		printf '%s\n' "$__path" >> "$FINAL"
+	done < "$WANT"
+	while IFS= read -r __path; do
+		[ "$__path" ] || continue
+		case "$__path" in
+		*/bhotkeys-*/) : ok ;;
+		*) continue
+		esac
+		quietly grep -F -x "$__path" "$FINAL" && continue
+		quietly gsettings reset-recursively "$custom_schema:$__path" ||
+			: reset
+	done < "$PATHS"
+	join_binds "$FINAL" joined || return 0
+	if [ "$joined" != "$__raw" ]; then
+		gs_set "$media_schema" custom-keybindings "$joined" ||
+			: customs
+	fi
+}
+
+############################################################ MAIN
+
+bh_resolve || exit 0
+case "$1" in
+--wait) apply_wait gnome_up || exit 0 ;;
+*) gnome_up || exit 0
+esac
+
+WANT=$( mktemp )
+HAVE=$( mktemp )
+CUR=$( mktemp )
+PREV=$( mktemp )
+PATHS=$( mktemp )
+FINAL=$( mktemp )
+RAWK=$( mktemp )
+ROWS=$( mktemp )
+ROWS2=$( mktemp )
+trap 'rm -f "$WANT" "$HAVE" "$CUR" "$PREV" "$PATHS" "$FINAL" "$RAWK" \
+	"$ROWS" "$ROWS2" "$CUR.del" "$HAVE.new"' EXIT
+"$BH" --print-keys "$bh_wm" > "$RAWK" || exit 0
+load_have
+swallow
+sync_owned
+
+################################################################################
+# END
+################################################################################

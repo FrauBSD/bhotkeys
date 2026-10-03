@@ -1,0 +1,85 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Grab listener chords in openbox $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# Grab listener chords in openbox so the focused client does not
+# see them. Each new chord runs true. A keybind openbox already
+# has is left alone. An lxde or lxqt session is not this script.
+# Missing openbox is not an error.
+#
+############################################################ GLOBALS
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+bh_wm=openbox
+
+ob_lib="${0%/*}/bhotkeys-openbox.subr"
+[ -f "$ob_lib" ] || ob_lib="${0%/*}/../../bhotkeys/bhotkeys-openbox.subr"
+[ -f "$ob_lib" ] || ob_lib=/usr/local/bhotkeys/bhotkeys-openbox.subr
+[ -f "$ob_lib" ] || exit 0
+. "$ob_lib"
+
+############################################################ FUNCTIONS
+
+openbox_up()
+{
+	proc_eq lxsession && return 1
+	proc_eq lxqt-session && return 1
+	proc_eq openbox
+}
+
+
+rc_path()
+{
+	if [ "$XDG_CONFIG_HOME" ]; then
+		rc_file="$XDG_CONFIG_HOME/openbox/rc.xml"
+	else
+		rc_file="$HOME/.config/openbox/rc.xml"
+	fi
+}
+
+
+seed_rc()
+{
+	[ -f "$rc_file" ] && return 0
+	copy_first "$rc_file" \
+		/usr/local/etc/xdg/openbox/rc.xml \
+		/usr/local/share/openbox/rc.xml \
+		/etc/xdg/openbox/rc.xml
+}
+
+
+main()
+{
+	case "$1" in
+	--wait) apply_wait openbox_up || exit 0 ;;
+	*) openbox_up || exit 0
+	esac
+	[ "$HOME" ] || exit 0
+	bh_resolve || exit 0
+	rc_path
+	seed_rc || exit 0
+	ob_apply
+}
+
+case "$0" in
+*bhotkeys-openbox-apply) main "$@" ;;
+esac
+
+################################################################################
+# END
+################################################################################

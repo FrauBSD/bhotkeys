@@ -1,0 +1,171 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Plant xmonad keys and reload $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD$
+#
+############################################################ INFORMATION
+#
+# xmonad has no runtime key injection. This writes
+# ~/.xmonad/lib/BhotkeysSwallow.hs. A one-line
+# "main = xmonad def" (or defaultConfig), with no module header,
+# is wired so existing bindings keep the chord and the rest are
+# added. A config that already names bhotkeysKeys is recompiled.
+# Anything else is left for the user to import. Missing xmonad is
+# not an error.
+#
+############################################################ GLOBALS
+
+seq_lib="${0%/*}/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
+[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
+[ -f "$seq_lib" ] || exit 0
+. "$seq_lib"
+bh_wm=xmonad
+
+############################################################ FUNCTIONS
+
+xmonad_up()
+{
+	proc_eq xmonad
+}
+
+emit_module()
+{
+	local __chords="$1" __id __key __n
+
+	printf '%s\n' 'module BhotkeysSwallow (bhotkeysKeys) where'
+	printf '%s\n' 'import XMonad'
+	printf '%s\n' '-- Listener chords. Each one runs true.'
+	printf '%s\n' 'bhotkeysKeys :: [((KeyMask, KeySym), X ())]'
+	__n=0
+	while IFS='	' read -r __id __key; do
+		[ "$__id" ] || continue
+		quietly grep -F -x "$__key" "$seen" && continue
+		printf '%s\n' "$__key" >> "$seen"
+		if [ "$__n" -eq 0 ]; then
+			printf '%s\n' 'bhotkeysKeys ='
+			printf '%s\n' "    [ ($__key, spawn \"/usr/bin/true\")"
+		else
+			printf '%s\n' "    , ($__key, spawn \"/usr/bin/true\")"
+		fi
+		__n=$(( $__n + 1 ))
+	done < "$__chords"
+	if [ "$__n" -eq 0 ]; then
+		printf '%s\n' 'bhotkeysKeys = []'
+	else
+		printf '%s\n' '    ]'
+	fi
+}
+
+# Wire the stock one-liner. A module header or an existing hook is
+# left as the user wrote it
+hook_main()
+{
+	local __file="$1" __tmp __kind
+
+	quietly grep -F 'bhotkeysKeys' "$__file" && return 0
+	quietly grep -E '^module ' "$__file" && return 0
+	__kind=
+	quietly grep -x 'main = xmonad def' "$__file" &&
+		__kind=def
+	quietly grep -x 'main = xmonad defaultConfig' "$__file" &&
+		__kind=defaultConfig
+	[ "$__kind" ] || return 0
+	__tmp=$( mktemp ) || return 1
+	{
+		printf '%s\n' 'import qualified Data.Map as M'
+		printf '%s\n' 'import BhotkeysSwallow (bhotkeysKeys)'
+		grep -v -x 'main = xmonad def' "$__file" |
+			grep -v -x 'main = xmonad defaultConfig'
+		if [ "$__kind" = def ]; then
+			printf '%s\n' \
+				'main = xmonad $ def { keys = \c -> M.union (keys def c) (M.fromList bhotkeysKeys) }'
+		else
+			printf '%s\n' \
+				'main = xmonad $ defaultConfig { keys = \c -> M.union (keys defaultConfig c) (M.fromList bhotkeysKeys) }'
+		fi
+	} > "$__tmp"
+	cat "$__tmp" > "$__file" || {
+		rm -f "$__tmp"
+		return 1
+	}
+	rm -f "$__tmp"
+}
+
+main()
+{
+	local __chords __body __seen __hs __mod __hsbak __modbak __changed
+
+	case "$1" in
+	--wait) apply_wait xmonad_up || exit 0 ;;
+	*) xmonad_up || exit 0
+	esac
+	[ "$HOME" ] || exit 0
+	bh_resolve || exit 0
+	have xmonad || exit 0
+	__mod="$HOME/.xmonad/lib/BhotkeysSwallow.hs"
+	__hs="$HOME/.xmonad/xmonad.hs"
+	__chords=$( mktemp ) || exit 0
+	__body=$( mktemp ) || exit 0
+	__seen=$( mktemp ) || exit 0
+	seen="$__seen"
+	trap 'rm -f "$__chords" "$__body" "$__seen"' EXIT
+	chord_file "$__chords" || exit 0
+	emit_module "$__chords" > "$__body"
+	mkdir -p "${__mod%/*}" || exit 0
+	__changed=
+	if [ ! -f "$__mod" ] || ! cmp -s "$__mod" "$__body"; then
+		__changed=1
+	fi
+	if [ -f "$__hs" ]; then
+		if ! quietly grep -F 'bhotkeysKeys' "$__hs"; then
+			if quietly grep -x 'main = xmonad def' "$__hs" ||
+			   quietly grep -x 'main = xmonad defaultConfig' "$__hs"
+			then
+				__changed=1
+			fi
+		fi
+	fi
+	[ "$__changed" ] || exit 0
+	__modbak=$( mktemp ) || exit 0
+	__hsbak=$( mktemp ) || exit 0
+	trap 'rm -f "$__chords" "$__body" "$__seen" "$__modbak" "$__hsbak"' \
+		EXIT
+	if [ -f "$__mod" ]; then
+		cp "$__mod" "$__modbak" || exit 0
+	fi
+	if [ -f "$__hs" ]; then
+		cp "$__hs" "$__hsbak" || exit 0
+	fi
+	cat "$__body" > "$__mod" || exit 0
+	if [ -f "$__hs" ]; then
+		hook_main "$__hs" || {
+			[ -s "$__modbak" ] && cat "$__modbak" > "$__mod"
+			exit 0
+		}
+	fi
+	if [ -f "$__hs" ]; then
+		if ! quietly xmonad --recompile; then
+			[ -s "$__modbak" ] && cat "$__modbak" > "$__mod"
+			[ -s "$__hsbak" ] && cat "$__hsbak" > "$__hs"
+			exit 0
+		fi
+		quietly xmonad --restart || : restart failed
+	fi
+}
+
+case "$0" in
+*bhotkeys-xmonad-apply) main "$@" ;;
+esac
+
+################################################################################
+# END
+################################################################################
