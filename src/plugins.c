@@ -325,7 +325,7 @@ bh_load(struct bh_set *set)
 	strlcpy(set->panel_chord, BH_PANEL_CHORD, sizeof(set->panel_chord));
 	strlcpy(set->panel_alt_chord, BH_PANEL_ALT_CHORD,
 	    sizeof(set->panel_alt_chord));
-	scan_dir(set, "/usr/local/share/bhotkeys/plugins.d");
+	scan_dir(set, PREFIX "/share/bhotkeys/plugins.d");
 	if (home != NULL) {
 		snprintf(path, sizeof(path), "%s/share/bhotkeys/plugins.d",
 		    home);

@@ -118,8 +118,8 @@ main(int argc, char **argv)
 		unlink(tmp);
 		return (1);
 	}
-	fprintf(fp, "bhotkeys:%s:0:0::0:0:bhotkeys panel:/var/empty:/usr/sbin/nologin\n",
-	    hash);
+	fprintf(fp, "bhotkeys:%s:0:0::0:0:%s:/var/empty:/usr/sbin/nologin\n",
+	    hash, "bhotkeys panel");
 	if (fclose(fp) != 0) {
 		unlink(tmp);
 		return (1);

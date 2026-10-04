@@ -9,7 +9,7 @@
 #
 # $Title: Plugin comment reader for apply scripts $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-plugin.subr 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-plugin.subr 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -65,7 +65,7 @@ scan_dirs()
 	local __dir __f
 
 	:> "$__out"
-	for __dir in /usr/local/share/bhotkeys/plugins.d \
+	for __dir in "$PREFIX/share/bhotkeys/plugins.d" \
 		${HOME:+$HOME/share/bhotkeys/plugins.d} \
 		${BHOTKEYS_PLUGINS:+$BHOTKEYS_PLUGINS} \
 	; do

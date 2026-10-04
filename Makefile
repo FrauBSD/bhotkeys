@@ -8,7 +8,7 @@
 #
 # $Title: bhotkeys - grab-proof plugin host $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/Makefile 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/Makefile 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ PROGRAMS
 
@@ -113,11 +113,22 @@ APPLY_SCRIPTS=	libexec/${PROGRAM}-bvwm-apply \
 		libexec/${PROGRAM}-xfce-apply \
 		libexec/${PROGRAM}-xmonad-apply
 
+PREFIX_SUBR=	libexec/${PROGRAM}-prefix.subr
+SUBR_SRC=	${PREFIX_SUBR} \
+		libexec/${PROGRAM}-seq.subr \
+		libexec/${PROGRAM}-plugin.subr \
+		libexec/${PROGRAM}-openbox.subr
+
 ############################################################ TARGETS
 
 .PHONY: all
 
-all: ${PROGRAM} ${PANEL} ${PASSWD} bin/${START} ${MAN}
+all: ${PROGRAM} ${PANEL} ${PASSWD} bin/${START} ${MAN} \
+	${PREFIX_SUBR}
+
+${PREFIX_SUBR}: ${PREFIX_SUBR}.in Makefile
+	sed -e 's|@PREFIX@|${PREFIX}|g' ${PREFIX_SUBR}.in > ${PREFIX_SUBR}
+	chmod 644 ${PREFIX_SUBR}
 
 bin/${START}: bin/${START}.in Makefile
 	sed -e 's|@PREFIX@|${PREFIX}|g' bin/${START}.in > bin/${START}
@@ -155,17 +166,14 @@ ${PASSWD}: ${OBJS_PASSWD}
 install: all
 	mkdir -p ${DESTDIR}${BINDIR} \
 	    ${DESTDIR}${LIBEXECDIR}/${PROGRAM} \
-	    ${DESTDIR}${PREFIX}/${PROGRAM} \
 	    ${DESTDIR}${SHAREDIR}/${PROGRAM}/plugins.d \
 	    ${DESTDIR}${MANDIR}
 	install -m 755 ${PROGRAM} ${PANEL} ${PASSWD} bin/${START} \
 		${DESTDIR}${BINDIR}
 	install -m 755 ${APPLY_SCRIPTS} \
 		${DESTDIR}${LIBEXECDIR}/${PROGRAM}
-	install -m 644 libexec/${PROGRAM}-seq.subr \
-		libexec/${PROGRAM}-plugin.subr \
-		libexec/${PROGRAM}-openbox.subr \
-		${DESTDIR}${PREFIX}/${PROGRAM}
+	install -m 644 ${SUBR_SRC} \
+		${DESTDIR}${LIBEXECDIR}/${PROGRAM}
 .for m in ${MANS}
 	gzip -cn man/${m}.1 > ${DESTDIR}${MANDIR}/${m}.1.gz
 .endfor
@@ -178,7 +186,8 @@ install: all
 
 clean:
 	rm -f ${PROGRAM} ${PANEL} ${PASSWD} bin/${START} ${MAN} \
-		${OBJS_PROGRAM} ${OBJS_PANEL} ${OBJS_PASSWD}
+		${OBJS_PROGRAM} ${OBJS_PANEL} ${OBJS_PASSWD} \
+		${PREFIX_SUBR}
 
 ################################################################################
 # END

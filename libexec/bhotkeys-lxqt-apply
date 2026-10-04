@@ -9,7 +9,7 @@
 #
 # $Title: Grab listener chords in LXQt $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-lxqt-apply 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-lxqt-apply 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -19,13 +19,13 @@
 # written, then the daemon is started again. Missing lxqt-session
 # is not an error.
 #
+############################################################ INCLUDES
+
+. "${0%/*}/bhotkeys-prefix.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-seq.subr" || exit
+
 ############################################################ GLOBALS
 
-seq_lib="${0%/*}/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
-[ -f "$seq_lib" ] || exit 0
-. "$seq_lib"
 bh_wm=lxqt
 
 ############################################################ FUNCTIONS
@@ -50,8 +50,7 @@ build_want()
 
 	while IFS='	' read -r __id __enc; do
 		[ "$__id" ] || continue
-		quietly grep -F -x "$__enc" "$seen" &&
-			continue
+		grep -qFx "$__enc" "$seen" && continue
 		printf '%s\n' "$__enc" >> "$seen"
 		printf '%s %s\n' "$__enc" "$__id"
 	done < "$__chords"
@@ -113,9 +112,9 @@ seed_conf()
 {
 	[ -f "$conf_file" ] && return 0
 	copy_first "$conf_file" \
-		/usr/local/share/lxqt/globalkeyshortcuts.conf \
-		/usr/local/etc/xdg/lxqt/globalkeyshortcuts.conf \
-		/usr/local/share/lxqt/lxqt-globalkeys/globalkeyshortcuts.conf \
+		"$LXQT_PREFIX/share/lxqt/globalkeyshortcuts.conf" \
+		"$LXQT_PREFIX/etc/xdg/lxqt/globalkeyshortcuts.conf" \
+		"$LXQT_PREFIX/share/lxqt/lxqt-globalkeys/globalkeyshortcuts.conf" \
 		/usr/share/lxqt/globalkeyshortcuts.conf
 }
 

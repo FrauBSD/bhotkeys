@@ -9,7 +9,7 @@
 #
 # $Title: Grab listener chords in Window Maker $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-windowmaker-apply 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-windowmaker-apply 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -19,13 +19,13 @@
 # Window Maker so it re-reads the menu. SIGHUP would exit it.
 # Missing wmaker is not an error.
 #
+############################################################ INCLUDES
+
+. "${0%/*}/bhotkeys-prefix.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-seq.subr" || exit
+
 ############################################################ GLOBALS
 
-seq_lib="${0%/*}/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
-[ -f "$seq_lib" ] || exit 0
-. "$seq_lib"
 bh_wm=windowmaker
 
 begin='"bhotkeys" MENU'
@@ -71,11 +71,11 @@ menu_path()
 
 menu_kind()
 {
-	if quietly grep -E 'MENU$' "$menu_file"; then
+	if grep -qE 'MENU$' "$menu_file"; then
 		printf '%s\n' menu
 		return 0
 	fi
-	if quietly grep -E '^[[:space:]]*\(' "$menu_file"; then
+	if grep -qE '^[[:space:]]*\(' "$menu_file"; then
 		printf '%s\n' paren
 		return 0
 	fi
@@ -119,10 +119,8 @@ emit_menu()
 	printf '%s\n' "$begin"
 	while IFS='	' read -r __id __cut; do
 		[ "$__id" ] || continue
-		quietly grep -F -x "$__cut" "$__taken" &&
-			continue
-		quietly grep -F -x "$__cut" "$seen" &&
-			continue
+		grep -qF -x "$__cut" "$__taken" && continue
+		grep -qF -x "$__cut" "$seen" && continue
 		printf '%s\n' "$__cut" >> "$seen"
 		printf '%s\n' \
 			"\"bhotkeys-$__id\" SHORTCUT \"$__cut\" EXEC \"/usr/bin/true\""
@@ -138,10 +136,8 @@ emit_paren()
 	printf '%s\n' "$pbegin"
 	while IFS='	' read -r __id __cut; do
 		[ "$__id" ] || continue
-		quietly grep -F -x "$__cut" "$__taken" &&
-			continue
-		quietly grep -F -x "$__cut" "$seen" &&
-			continue
+		grep -qF -x "$__cut" "$__taken" && continue
+		grep -qF -x "$__cut" "$seen" && continue
 		printf '%s\n' "$__cut" >> "$seen"
 		__line="(\"bhotkeys-$__id\", SHORTCUT, \"$__cut\", EXEC, \"/usr/bin/true\")"
 		[ "$__last" ] && printf '%s\n' "$__last,"
@@ -224,9 +220,9 @@ seed_menu()
 {
 	[ -f "$menu_file" ] && return 0
 	copy_first "$menu_file" \
-		/usr/local/share/WindowMaker/menu \
-		/usr/local/GNUstep/Library/WindowMaker/menu \
-		/usr/local/etc/WindowMaker/menu
+		"$WINDOWMAKER_PREFIX/share/WindowMaker/menu" \
+		"$WINDOWMAKER_PREFIX/GNUstep/Library/WindowMaker/menu" \
+		"$WINDOWMAKER_PREFIX/etc/WindowMaker/menu"
 }
 
 reload_wmaker()

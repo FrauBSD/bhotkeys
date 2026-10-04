@@ -1,10 +1,27 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-03 18:57:00 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-04 11:21:26 -0700 Devin Teske $)
 
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed
 in that tag (from the previous tag, or from the start of the
 repository for 1.0).
+
+## 1.1 (2026-10-04)
+
+- binaries and scripts take the build `PREFIX` (default
+  `/usr/local`); homedir paths are gone
+- `bhotkeys-prefix.subr` is generated from `.in` and sourced
+  from the apply script's own directory; it sets `PREFIX`; the
+  other libraries come from `$PREFIX/libexec/bhotkeys`; a
+  missing file or a syntax error stops the script
+- those libraries install beside the apply scripts
+- the listener scans `$PREFIX/share/bhotkeys/plugins.d`, the
+  panel falls back to `$PREFIX/bin/bhotkeys-panel`, and the panel
+  runs `$PREFIX/libexec/bhotkeys/bhotkeys-*-apply`
+- fluxbox, i3, lxde, lxqt, openbox, and windowmaker paths use
+  `FLUXBOX_PREFIX`, `I3_PREFIX`, `LXDE_PREFIX`, `LXQT_PREFIX`,
+  `OPENBOX_PREFIX`, and `WINDOWMAKER_PREFIX`; each defaults to
+  `PREFIX`, and a value in the environment wins
 
 ## 1.0 (2026-10-03)
 

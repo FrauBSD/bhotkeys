@@ -9,7 +9,7 @@
 #
 # $Title: Register listener chords with Xfce $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-xfce-apply 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-xfce-apply 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -20,6 +20,12 @@
 # bhotkeys --print-keys xfce supplies the chords as XFCE
 # accelerators
 #
+############################################################ INCLUDES
+
+. "${0%/*}/bhotkeys-prefix.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-seq.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-plugin.subr" || exit
+
 ############################################################ GLOBALS
 
 pgm="${0##*/}" # Program basename
@@ -27,17 +33,6 @@ pgm="${0##*/}" # Program basename
 channel=xfce4-keyboard-shortcuts
 mark=/usr/bin/true
 
-seq_lib="${0%/*}/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
-[ -f "$seq_lib" ] || exit 0
-. "$seq_lib"
-
-plug_lib="${0%/*}/bhotkeys-plugin.subr"
-[ -f "$plug_lib" ] || plug_lib="${0%/*}/../../bhotkeys/bhotkeys-plugin.subr"
-[ -f "$plug_lib" ] || plug_lib=/usr/local/bhotkeys/bhotkeys-plugin.subr
-[ -f "$plug_lib" ] || exit 0
-. "$plug_lib"
 bh_wm=xfce
 bh_tag=xfconf
 

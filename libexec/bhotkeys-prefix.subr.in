@@ -1,0 +1,37 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Install prefix for the bhotkeys scripts $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-prefix.subr.in 2026-10-04 11:21:26 -0700 Devin Teske $
+#
+############################################################ INFORMATION
+#
+# Sourced by the apply scripts, from the same directory. PREFIX is
+# the install prefix. Package prefixes default to PREFIX.
+#
+############################################################ CONFIG
+
+case "$0" in
+*bhotkeys-prefix.subr) exit 0 ;;
+esac
+
+############################################################ GLOBALS
+
+PREFIX="@PREFIX@"
+FLUXBOX_PREFIX="${FLUXBOX_PREFIX:-$PREFIX}"
+I3_PREFIX="${I3_PREFIX:-$PREFIX}"
+LXDE_PREFIX="${LXDE_PREFIX:-$PREFIX}"
+LXQT_PREFIX="${LXQT_PREFIX:-$PREFIX}"
+OPENBOX_PREFIX="${OPENBOX_PREFIX:-$PREFIX}"
+WINDOWMAKER_PREFIX="${WINDOWMAKER_PREFIX:-$PREFIX}"
+
+################################################################################
+# END
+################################################################################

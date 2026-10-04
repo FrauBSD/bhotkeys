@@ -9,7 +9,7 @@
 #
 # $Title: Openbox rc.xml writer for apply scripts $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-openbox.subr 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-openbox.subr 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -64,10 +64,8 @@ emit_block()
 	printf '%s\n' "$begin"
 	while IFS='	' read -r __id __key; do
 		[ "$__id" ] || continue
-		quietly grep -F -x "$__key" "$__taken" &&
-			continue
-		quietly grep -F -x "$__key" "$seen" &&
-			continue
+		grep -qFx "$__key" "$__taken" && continue
+		grep -qFx "$__key" "$seen" && continue
 		printf '%s\n' "$__key" >> "$seen"
 		printf '%s\n' "  <keybind key=\"$__key\">"
 		printf '%s\n' "    <action name=\"Execute\">"

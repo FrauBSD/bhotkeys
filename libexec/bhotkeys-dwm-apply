@@ -9,7 +9,7 @@
 #
 # $Title: Plant dwm keys for the next rebuild $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-dwm-apply 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-dwm-apply 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -19,13 +19,13 @@
 # binary picks the grabs up on the next rebuild. This script does not
 # rebuild or restart dwm. Missing dwm is not an error.
 #
+############################################################ INCLUDES
+
+. "${0%/*}/bhotkeys-prefix.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-seq.subr" || exit
+
 ############################################################ GLOBALS
 
-seq_lib="${0%/*}/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
-[ -f "$seq_lib" ] || exit 0
-. "$seq_lib"
 bh_wm=dwm
 
 ############################################################ FUNCTIONS
@@ -42,10 +42,10 @@ emit_header()
 	printf '%s\n' '/* Listener chords. Each one runs true. */'
 	while IFS='	' read -r __id __key; do
 		[ "$__id" ] || continue
-		quietly grep -F -x "$__key" "$seen" && continue
+		grep -qFx "$__key" "$seen" && continue
 		printf '%s\n' "$__key" >> "$seen"
-		printf '\t{ %s, spawn, {.v = (const char *[]){ "/usr/bin/true", NULL } } },\n' \
-			"$__key"
+		printf '\t{ %s, spawn, {.v = %s } },\n' \
+			"$__key" '(const char *[]){ "/usr/bin/true", NULL }'
 	done < "$__chords"
 }
 
@@ -58,7 +58,7 @@ plant_include()
 	case "$__inc" in
 	*\"*|*\\*) return 0 ;;
 	esac
-	quietly grep -F "$__inc" "$__cfg" && return 0
+	grep -qF "$__inc" "$__cfg" && return 0
 	__tmp=$( mktemp ) || return 1
 	if ! awk -v inc="$__inc" '
 		function trim(s) {

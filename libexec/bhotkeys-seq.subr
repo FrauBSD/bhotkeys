@@ -9,7 +9,7 @@
 #
 # $Title: Subroutines shared by the apply scripts $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-seq.subr 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-seq.subr 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -56,13 +56,8 @@ bh_resolve()
 {
 	BH="${BHOTKEYS:-bhotkeys}"
 	if ! have "$BH"; then
-		if [ -x /home/dteske/bin/bhotkeys ]; then
-			BH=/home/dteske/bin/bhotkeys
-		elif [ -x /usr/local/bin/bhotkeys ]; then
-			BH=/usr/local/bin/bhotkeys
-		else
-			return 1
-		fi
+		BH="$PREFIX/bin/bhotkeys"
+		[ -x "$BH" ] || return 1
 	fi
 }
 

@@ -196,9 +196,7 @@ bh_run_panel(void)
 	argv[1] = bh_greeter ? "--greeter" : "--session";
 	argv[2] = NULL;
 	execvp("bhotkeys-panel", argv);
-	execl("/usr/local/bin/bhotkeys-panel", "bhotkeys-panel", argv[1],
-	    (char *)NULL);
-	execl("/home/dteske/bin/bhotkeys-panel", "bhotkeys-panel", argv[1],
+	execl(PREFIX "/bin/bhotkeys-panel", "bhotkeys-panel", argv[1],
 	    (char *)NULL);
 	_exit(127);
 }

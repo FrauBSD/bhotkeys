@@ -9,7 +9,7 @@
 #
 # $Title: Plant xmonad keys and reload $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-xmonad-apply 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-xmonad-apply 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -21,13 +21,13 @@
 # Anything else is left for the user to import. Missing xmonad is
 # not an error.
 #
+############################################################ INCLUDES
+
+. "${0%/*}/bhotkeys-prefix.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-seq.subr" || exit
+
 ############################################################ GLOBALS
 
-seq_lib="${0%/*}/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
-[ -f "$seq_lib" ] || exit 0
-. "$seq_lib"
 bh_wm=xmonad
 
 ############################################################ FUNCTIONS
@@ -48,7 +48,7 @@ emit_module()
 	__n=0
 	while IFS='	' read -r __id __key; do
 		[ "$__id" ] || continue
-		quietly grep -F -x "$__key" "$seen" && continue
+		grep -qFx "$__key" "$seen" && continue
 		printf '%s\n' "$__key" >> "$seen"
 		if [ "$__n" -eq 0 ]; then
 			printf '%s\n' 'bhotkeysKeys ='
@@ -71,12 +71,11 @@ hook_main()
 {
 	local __file="$1" __tmp __kind
 
-	quietly grep -F 'bhotkeysKeys' "$__file" && return 0
-	quietly grep -E '^module ' "$__file" && return 0
+	grep -qF 'bhotkeysKeys' "$__file" && return 0
+	grep -qE '^module ' "$__file" && return 0
 	__kind=
-	quietly grep -x 'main = xmonad def' "$__file" &&
-		__kind=def
-	quietly grep -x 'main = xmonad defaultConfig' "$__file" &&
+	grep -qx 'main = xmonad def' "$__file" && __kind=def
+	grep -qx 'main = xmonad defaultConfig' "$__file" &&
 		__kind=defaultConfig
 	[ "$__kind" ] || return 0
 	__tmp=$( mktemp ) || return 1
@@ -86,11 +85,15 @@ hook_main()
 		grep -v -x 'main = xmonad def' "$__file" |
 			grep -v -x 'main = xmonad defaultConfig'
 		if [ "$__kind" = def ]; then
-			printf '%s\n' \
-				'main = xmonad $ def { keys = \c -> M.union (keys def c) (M.fromList bhotkeysKeys) }'
+			printf '%s = %s $ %s { keys = \c -> %s (%s) (%s) }\n' \
+				main xmonad def M.union \
+				'keys def c' \
+				'M.fromList bhotkeysKeys'
 		else
-			printf '%s\n' \
-				'main = xmonad $ defaultConfig { keys = \c -> M.union (keys defaultConfig c) (M.fromList bhotkeysKeys) }'
+			printf '%s = %s $ %s { keys = \c -> %s (%s) (%s) }\n' \
+				main xmonad defaultConfig M.union \
+				'keys defaultConfig c' \
+				'M.fromList bhotkeysKeys'
 		fi
 	} > "$__tmp"
 	cat "$__tmp" > "$__file" || {
@@ -126,9 +129,9 @@ main()
 		__changed=1
 	fi
 	if [ -f "$__hs" ]; then
-		if ! quietly grep -F 'bhotkeysKeys' "$__hs"; then
-			if quietly grep -x 'main = xmonad def' "$__hs" ||
-			   quietly grep -x 'main = xmonad defaultConfig' "$__hs"
+		if ! grep -qF 'bhotkeysKeys' "$__hs"; then
+			if grep -qx 'main = xmonad def' "$__hs" ||
+			   grep -qx 'main = xmonad defaultConfig' "$__hs"
 			then
 				__changed=1
 			fi

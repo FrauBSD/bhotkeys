@@ -9,7 +9,7 @@
 #
 # $Title: Grab listener chords in Cinnamon $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-cinnamon-apply 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-cinnamon-apply 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -18,13 +18,13 @@
 # A sequence Cinnamon already owns is left alone. Missing cinnamon
 # is not an error.
 #
+############################################################ INCLUDES
+
+. "${0%/*}/bhotkeys-prefix.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-seq.subr" || exit
+
 ############################################################ GLOBALS
 
-seq_lib="${0%/*}/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
-[ -f "$seq_lib" ] || exit 0
-. "$seq_lib"
 bh_wm=cinnamon
 
 parent=org.cinnamon.desktop.keybindings
@@ -144,8 +144,8 @@ main()
 	__accs=$( mktemp ) || exit 0
 	listed="$__listed"
 	keep_acc="$__accs"
-	trap 'rm -f "$__chords" "$__listed" "$__user" "$__keep" "$__old" "$__accs" "$__user.ids"' \
-		EXIT
+	trap 'rm -f "$__chords" "$__listed" "$__user" "$__keep" "$__old" \
+		"$__accs" "$__user.ids"' EXIT
 	chord_file "$__chords" || exit 0
 	gsettings list-recursively "$parent" > "$__listed" || exit 0
 	printf '%s\n' "$__cur" | list_ids > "$__user.ids"
@@ -159,7 +159,7 @@ main()
 	while IFS='	' read -r __id __acc; do
 		[ "$__id" ] || continue
 		owned_acc "$__acc" "$__id" && continue
-		quietly grep -F -x "$__acc" "$keep_acc" &&
+		grep -qFx "$__acc" "$keep_acc" &&
 			continue
 		__path="$custom:${base}bhotkeys-$__id/"
 		gs_set "$__path" name "bhotkeys" || continue
@@ -174,7 +174,7 @@ main()
 	gs_set "$parent" custom-list "$__val" || exit 0
 	while read -r __id; do
 		[ "$__id" ] || continue
-		quietly grep -F -x "$__id" "$__keep" && continue
+		grep -qFx "$__id" "$__keep" && continue
 		reset_id "$__id"
 	done < "$__old"
 }

@@ -148,7 +148,8 @@ cancel_super_menu(void)
 	    (int)sizeof(dir))
 		return;
 	(void)mkdir(dir, 0700);
-	if (snprintf(path, sizeof(path), "%s/chord", dir) < (int)sizeof(path)) {
+	if (snprintf(path, sizeof(path),
+	    "%s/chord", dir) < (int)sizeof(path)) {
 		fp = fopen(path, "w");
 		if (fp != NULL)
 			fclose(fp);
@@ -187,7 +188,8 @@ nudge_panel(void)
 	FILE *fp;
 	pid_t pid;
 
-	snprintf(path, sizeof(path), "/tmp/bhotkeys-panel.%ld", (long)getuid());
+	snprintf(path, sizeof(path), "/tmp/bhotkeys-panel.%ld",
+	    (long)getuid());
 	fp = fopen(path, "r");
 	if (fp == NULL)
 		return (0);
@@ -316,7 +318,7 @@ on_key(int type, KeyCode code, unsigned int state, Time when)
 		gettimeofday(&up_when, NULL);
 		return;
 	}
-	/* Autorepeat is a release then a press; a short gap is not a new chord */
+	/* Autorepeat is a release then press; short gap is not a new chord */
 	if (up_pending && code == up_code) {
 		struct timeval now;
 
@@ -400,7 +402,8 @@ maybe_reload(struct bh_set *set, struct timespec *stamp)
 		strlcpy(path, BH_GREETER_FILE, sizeof(path));
 		if (stat(path, &st) != 0)
 			return;
-		if (st.st_mtim.tv_sec == stamp->tv_sec && st.st_mtim.tv_nsec == stamp->tv_nsec)
+		if (st.st_mtim.tv_sec == stamp->tv_sec &&
+		    st.st_mtim.tv_nsec == stamp->tv_nsec)
 			return;
 		*stamp = st.st_mtim;
 		bh_load(set);
@@ -416,7 +419,8 @@ maybe_reload(struct bh_set *set, struct timespec *stamp)
 	}
 	if (stat(path, &st) != 0)
 		return;
-	if (st.st_mtim.tv_sec == stamp->tv_sec && st.st_mtim.tv_nsec == stamp->tv_nsec)
+	if (st.st_mtim.tv_sec == stamp->tv_sec &&
+	    st.st_mtim.tv_nsec == stamp->tv_nsec)
 		return;
 	*stamp = st.st_mtim;
 	bh_load(set);

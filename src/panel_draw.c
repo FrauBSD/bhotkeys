@@ -100,7 +100,8 @@ draw_lock(Display *dpy, Window win, GC gc, int x, int y, int s, int locked)
 	sw = bw - 2 * t;
 	sx = x + (s - sw) / 2;
 	sy = y + t + t / 2;
-	XSetLineAttributes(dpy, gc, (unsigned)t, LineSolid, CapButt, JoinMiter);
+	XSetLineAttributes(dpy, gc, (unsigned)t, LineSolid, CapButt,
+	    JoinMiter);
 	XDrawLine(dpy, win, gc, sx, by, sx, sy);
 	XDrawLine(dpy, win, gc, sx, sy, sx + sw, sy);
 	if (locked)
@@ -119,7 +120,8 @@ draw_x(Display *dpy, Window win, GC gc, int x, int y, int s)
 
 	if (t < 2)
 		t = 2;
-	XSetLineAttributes(dpy, gc, (unsigned)t, LineSolid, CapButt, JoinMiter);
+	XSetLineAttributes(dpy, gc, (unsigned)t, LineSolid, CapButt,
+	    JoinMiter);
 	XDrawLine(dpy, win, gc, x + m, y + m, x + s - m, y + s - m);
 	XDrawLine(dpy, win, gc, x + s - m, y + m, x + m, y + s - m);
 	XSetLineAttributes(dpy, gc, 0, LineSolid, CapButt, JoinMiter);
@@ -163,13 +165,15 @@ panel_paint(Display *dpy, Window win, XftDraw *draw, XftFont *font,
 	gc = XCreateGC(dpy, win, GCForeground, &gv);
 	XFillRectangle(dpy, win, gc, 0, 0, (unsigned)ui->win_w,
 	    (unsigned)ui->win_h);
-	sbase = ui->search_y + (ui->search_h + font->ascent - font->descent) / 2;
+	sbase = ui->search_y +
+	    (ui->search_h + font->ascent - font->descent) / 2;
 	smbase = ui->search_y +
 	    (ui->search_h + small->ascent - small->descent) / 2;
 	caret_y = sbase - font->ascent;
 	caret_h = font->ascent + font->descent;
 	if (caret_y < ui->search_y + 2) caret_y = ui->search_y + 2;
-	if (caret_y + caret_h > ui->search_y + ui->search_h - 2) caret_h = ui->search_y + ui->search_h - 2 - caret_y;
+	if (caret_y + caret_h > ui->search_y + ui->search_h - 2)
+		caret_h = ui->search_y + ui->search_h - 2 - caret_y;
 
 	XSetForeground(dpy, gc, box_px);
 	XFillRectangle(dpy, win, gc, ui->search_x, ui->search_y,
@@ -226,7 +230,8 @@ panel_paint(Display *dpy, Window win, XftDraw *draw, XftFont *font,
 				ui->qpos = qn;
 			cx = ui->search_x + 12;
 			if (ui->qpos > 0)
-				cx += panel_text_w(dpy, font, ui->query, ui->qpos);
+				cx += panel_text_w(dpy, font, ui->query,
+				    ui->qpos);
 			XFillRectangle(dpy, win, gc, cx, caret_y, 2,
 			    (unsigned)caret_h);
 		}
@@ -368,12 +373,14 @@ panel_paint(Display *dpy, Window win, XftDraw *draw, XftFont *font,
 		    ui->act_x - ui->name_x - 12, lines, 6);
 		{
 			char names[4][120];
-			int nt = panel_wrap(dpy, font, panel_row_label(ui, idx),
+			int nt = panel_wrap(dpy, font,
+			    panel_row_label(ui, idx),
 			    ui->chord_x - ui->name_x - 12, names, 4);
 			int extra = 0;
 
 			if (nt > 1)
-				extra = (nt - 1) * (font->ascent + font->descent);
+				extra = (nt - 1) *
+				    (font->ascent + font->descent);
 			clip(draw, ui->name_x, ui->body_y,
 			    ui->act_x - ui->name_x - 8, ui->body_h);
 			for (li = 0; li < nlines; li++)
@@ -403,7 +410,8 @@ panel_paint(Display *dpy, Window win, XftDraw *draw, XftFont *font,
 	else if (bh_greeter && ui->readonly)
 		foot = "Locked. The lock makes this list writable.";
 	else
-		foot = "Esc to close. Check enables. Set keys, then press the chord. Reset restores it.";
+		foot = "Esc to close. Check enables." \
+		    " Set keys, then press the chord. Reset restores it.";
 	{
 		int clip_w = bh_greeter ? ui->win_w - ui->search_h - 40 :
 		    ui->win_w - 150;

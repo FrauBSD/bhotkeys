@@ -9,7 +9,7 @@
 #
 # $Title: Grab listener chords in LXDE $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-lxde-apply 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-lxde-apply 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -18,20 +18,15 @@
 # Each new chord runs true. A keybind already in that file is left
 # alone. Missing lxsession is not an error.
 #
+############################################################ INCLUDES
+
+. "${0%/*}/bhotkeys-prefix.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-seq.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-openbox.subr" || exit
+
 ############################################################ GLOBALS
 
-seq_lib="${0%/*}/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
-[ -f "$seq_lib" ] || exit 0
-. "$seq_lib"
 bh_wm=lxde
-
-ob_lib="${0%/*}/bhotkeys-openbox.subr"
-[ -f "$ob_lib" ] || ob_lib="${0%/*}/../../bhotkeys/bhotkeys-openbox.subr"
-[ -f "$ob_lib" ] || ob_lib=/usr/local/bhotkeys/bhotkeys-openbox.subr
-[ -f "$ob_lib" ] || exit 0
-. "$ob_lib"
 
 ############################################################ FUNCTIONS
 
@@ -55,9 +50,9 @@ seed_rc()
 {
 	[ -f "$rc_file" ] && return 0
 	copy_first "$rc_file" \
-		/usr/local/share/lxde/openbox/rc.xml \
-		/usr/local/etc/xdg/openbox/lxde-rc.xml \
-		/usr/local/etc/xdg/openbox/rc.xml \
+		"$LXDE_PREFIX/share/lxde/openbox/rc.xml" \
+		"$LXDE_PREFIX/etc/xdg/openbox/lxde-rc.xml" \
+		"$LXDE_PREFIX/etc/xdg/openbox/rc.xml" \
 		/etc/xdg/openbox/rc.xml
 }
 

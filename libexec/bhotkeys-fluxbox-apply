@@ -9,7 +9,7 @@
 #
 # $Title: Grab listener chords in fluxbox $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-fluxbox-apply 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-fluxbox-apply 2026-10-04 11:21:26 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -17,13 +17,13 @@
 # see them. Each new chord runs true. A chord the keys file already
 # names is left alone. Missing fluxbox is not an error.
 #
+############################################################ INCLUDES
+
+. "${0%/*}/bhotkeys-prefix.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-seq.subr" || exit
+
 ############################################################ GLOBALS
 
-seq_lib="${0%/*}/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib="${0%/*}/../../bhotkeys/bhotkeys-seq.subr"
-[ -f "$seq_lib" ] || seq_lib=/usr/local/bhotkeys/bhotkeys-seq.subr
-[ -f "$seq_lib" ] || exit 0
-. "$seq_lib"
 bh_wm=fluxbox
 
 begin='# bhotkeys'
@@ -95,14 +95,12 @@ emit_block()
 	printf '%s\n' "$begin"
 	while IFS='	' read -r __id __spec; do
 		[ "$__id" ] || continue
-		quietly grep -F -x "$__spec" "$__taken" &&
-			continue
+		grep -qFx "$__spec" "$__taken" && continue
 		awk -v s="$__spec" '
 			index($0, s " ") == 1 { found = 1 }
 			END { exit !found }
 		' "$__taken" && continue
-		quietly grep -F -x "$__spec" "$seen" &&
-			continue
+		grep -qFx "$__spec" "$seen" && continue
 		printf '%s\n' "$__spec" >> "$seen"
 		printf '%s :Exec /usr/bin/true\n' "$__spec"
 	done < "$__chords"
@@ -113,7 +111,7 @@ seed_keys()
 {
 	[ -f "$keys_file" ] && return 0
 	copy_first "$keys_file" \
-		/usr/local/share/fluxbox/keys \
+		"$FLUXBOX_PREFIX/share/fluxbox/keys" \
 		/usr/share/fluxbox/keys
 }
 

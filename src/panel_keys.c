@@ -120,23 +120,18 @@ static const char *const apply_wm[] = {
 };
 
 static void
-fork_apply(const char *home_path, const char *local_path)
+fork_apply(const char *path)
 {
-	const char *apply = NULL;
 	pid_t pid;
 
-	if (access(home_path, X_OK) == 0)
-		apply = home_path;
-	else if (access(local_path, X_OK) == 0)
-		apply = local_path;
-	if (apply == NULL)
+	if (access(path, X_OK) != 0)
 		return;
 	signal(SIGCHLD, SIG_IGN);
 	pid = fork();
 	if (pid < 0)
 		return;
 	if (pid == 0) {
-		execl(apply, apply, (char *)NULL);
+		execl(path, path, (char *)NULL);
 		_exit(127);
 	}
 }
@@ -144,14 +139,11 @@ fork_apply(const char *home_path, const char *local_path)
 static void
 fork_named(const char *name)
 {
-	char home_path[128];
-	char local_path[80];
+	char path[128];
 
-	snprintf(home_path, sizeof(home_path),
-	    "/home/dteske/bin/bhotkeys-%s-apply", name);
-	snprintf(local_path, sizeof(local_path),
-	    "/usr/local/libexec/bhotkeys/bhotkeys-%s-apply", name);
-	fork_apply(home_path, local_path);
+	snprintf(path, sizeof(path),
+	    PREFIX "/libexec/bhotkeys/bhotkeys-%s-apply", name);
+	fork_apply(path);
 }
 
 void
