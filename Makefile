@@ -8,7 +8,7 @@
 #
 # $Title: bhotkeys - grab-proof plugin host $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD$
+# $FrauBSD: bhotkeys/Makefile 2026-10-03 18:50:50 -0700 Devin Teske $
 #
 ############################################################ PROGRAMS
 
