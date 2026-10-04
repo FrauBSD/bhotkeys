@@ -1,3 +1,5 @@
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-03 18:57:00 -0700 Devin Teske $)
+
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed

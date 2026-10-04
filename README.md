@@ -1,3 +1,5 @@
+[//]: # ($FrauBSD: bhotkeys/README.md 2026-10-03 18:57:00 -0700 Devin Teske $)
+
 # bhotkeys
 
 Plugin hotkey listener for BSD desktops.
