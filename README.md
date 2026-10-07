@@ -1,4 +1,4 @@
-[//]: # ($FrauBSD: bhotkeys/README.md 2026-10-03 18:57:00 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/README.md 2026-10-06 22:02:09 -0700 Devin Teske $)
 
 # bhotkeys
 
@@ -39,22 +39,57 @@ make clean
 Installs `bhotkeys`, `bhotkeys-panel`, `bhotkeys-passwd`, and
 `bhotkeys-start` into `bin`; the per-manager apply scripts into
 `libexec/bhotkeys`; the shell libraries they share into
-`${PREFIX}/bhotkeys`; the man pages; and an empty
-`share/bhotkeys/plugins.d` for packages to fill.
+`${PREFIX}/bhotkeys`; the man pages; an empty
+`share/bhotkeys/plugins.d` for packages to fill;
+`${PREFIX}/etc/xdg/autostart/bhotkeys.desktop`; and
+`share/bhotkeys/i3.conf`.
 
 ## Usage
 
-One line in `~/.xsession` or the window manager rc:
+One line names the window manager:
 
 ```sh
-bhotkeys-start mate
+bhotkeys-start dwm
 ```
 
 That starts [bosd](https://github.com/FrauBSD/bosd) if it is
 installed (`--no-bosd` skips it), starts the listener told which
 window manager it is under, and runs that manager's apply script
 once the manager is up. Without a name the listener detects the
-manager itself.
+manager, and the apply script for that name runs. A manager
+already running is found on the first scan.
+
+GNOME, KDE, LXDE, LXQt, MATE, X-Cinnamon, and XFCE start it from
+`${PREFIX}/etc/xdg/autostart/bhotkeys.desktop` when the session
+starts. That entry does not name a manager. The listener detects
+one, and the apply script for that name runs. i3 does
+not read autostart. Include the installed file, which a package
+upgrade replaces in place:
+
+```
+include /usr/local/share/bhotkeys/i3.conf
+```
+
+bvwm, dwm, fluxbox, fvwm, openbox, windowmaker, and xmonad do not
+read autostart. `fvwm` is the name for the fvwm and fvwm3 programs.
+XDM runs `~/.xsession` as the session:
+
+```sh
+bhotkeys-start dwm
+exec dwm
+```
+
+GDM and SDDM source `~/.xprofile`, then run the session selected
+in the menu. Put the start line there, and leave the window
+manager to that session:
+
+```sh
+bhotkeys-start dwm
+```
+
+SDDM also sources `~/.xsession` before that session. An `exec` of
+the window manager in that file replaces the session SDDM was
+given.
 
 ```sh
 bhotkeys --daemon              # the session listener, detects the WM

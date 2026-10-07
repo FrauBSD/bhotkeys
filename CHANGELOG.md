@@ -1,10 +1,22 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-04 11:21:26 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-06 22:02:09 -0700 Devin Teske $)
 
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed
 in that tag (from the previous tag, or from the start of the
 repository for 1.0).
+
+## 1.2 (2026-10-06)
+
+- `bhotkeys-start` with no manager runs the apply script for the
+  manager it detects
+- XDG autostart entry runs `bhotkeys-start` for GNOME, KDE, LXDE,
+  LXQt, MATE, X-Cinnamon, and XFCE
+- `share/bhotkeys/i3.conf` is included from the i3 config; i3 does
+  not read autostart
+- XDM takes `bhotkeys-start` in `~/.xsession`; GDM and SDDM take
+  it in `~/.xprofile`
+- greeter commands get `BHOTKEYS_GREETER`
 
 ## 1.1 (2026-10-04)
 

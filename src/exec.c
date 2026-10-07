@@ -72,7 +72,7 @@ greeter_child_env(void)
 	}
 	setenv("HOME", "/root", 1);
 	setenv("XDG_RUNTIME_DIR", "/var/run/xdg/root", 1);
-	setenv("MENU_HOTKEYS_GREETER", "1", 1);
+	setenv("BHOTKEYS_GREETER", "1", 1);
 	setenv("DISPLAY_GREETER", "1", 1);
 	setenv("USER", "root", 1);
 	setenv("LOGNAME", "root", 1);

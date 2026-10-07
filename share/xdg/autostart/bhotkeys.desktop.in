@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=bhotkeys
+Comment=Session listener and bosd
+Exec=@PREFIX@/bin/bhotkeys-start
+Terminal=false
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=GNOME;KDE;LXDE;LXQt;MATE;X-Cinnamon;XFCE;

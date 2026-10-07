@@ -8,7 +8,7 @@
 #
 # $Title: bhotkeys - grab-proof plugin host $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/Makefile 2026-10-04 11:21:26 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/Makefile 2026-10-06 22:02:09 -0700 Devin Teske $
 #
 ############################################################ PROGRAMS
 
@@ -23,6 +23,7 @@ PREFIX?=	/usr/local
 BINDIR?=	${PREFIX}/bin
 LIBEXECDIR?=	${PREFIX}/libexec
 SHAREDIR?=	${PREFIX}/share
+ETCDIR?=	${PREFIX}/etc
 MANDIR?=	${SHAREDIR}/man/man1
 
 ############################################################ PKG-CONFIG
@@ -114,6 +115,8 @@ APPLY_SCRIPTS=	libexec/${PROGRAM}-bvwm-apply \
 		libexec/${PROGRAM}-xmonad-apply
 
 PREFIX_SUBR=	libexec/${PROGRAM}-prefix.subr
+AUTOSTART=	share/xdg/autostart/${PROGRAM}.desktop
+I3CONF=		share/${PROGRAM}/i3.conf
 SUBR_SRC=	${PREFIX_SUBR} \
 		libexec/${PROGRAM}-seq.subr \
 		libexec/${PROGRAM}-plugin.subr \
@@ -124,7 +127,7 @@ SUBR_SRC=	${PREFIX_SUBR} \
 .PHONY: all
 
 all: ${PROGRAM} ${PANEL} ${PASSWD} bin/${START} ${MAN} \
-	${PREFIX_SUBR}
+	${PREFIX_SUBR} ${AUTOSTART} ${I3CONF}
 
 ${PREFIX_SUBR}: ${PREFIX_SUBR}.in Makefile
 	sed -e 's|@PREFIX@|${PREFIX}|g' ${PREFIX_SUBR}.in > ${PREFIX_SUBR}
@@ -133,6 +136,12 @@ ${PREFIX_SUBR}: ${PREFIX_SUBR}.in Makefile
 bin/${START}: bin/${START}.in Makefile
 	sed -e 's|@PREFIX@|${PREFIX}|g' bin/${START}.in > bin/${START}
 	chmod 755 bin/${START}
+
+${AUTOSTART}: ${AUTOSTART}.in Makefile
+	sed -e 's|@PREFIX@|${PREFIX}|g' ${AUTOSTART}.in > ${AUTOSTART}
+
+${I3CONF}: ${I3CONF}.in Makefile
+	sed -e 's|@PREFIX@|${PREFIX}|g' ${I3CONF}.in > ${I3CONF}
 
 .for m in ${MANS}
 man/${m}.1: man/${m}.1.in Makefile
@@ -167,6 +176,7 @@ install: all
 	mkdir -p ${DESTDIR}${BINDIR} \
 	    ${DESTDIR}${LIBEXECDIR}/${PROGRAM} \
 	    ${DESTDIR}${SHAREDIR}/${PROGRAM}/plugins.d \
+	    ${DESTDIR}${ETCDIR}/xdg/autostart \
 	    ${DESTDIR}${MANDIR}
 	install -m 755 ${PROGRAM} ${PANEL} ${PASSWD} bin/${START} \
 		${DESTDIR}${BINDIR}
@@ -174,6 +184,10 @@ install: all
 		${DESTDIR}${LIBEXECDIR}/${PROGRAM}
 	install -m 644 ${SUBR_SRC} \
 		${DESTDIR}${LIBEXECDIR}/${PROGRAM}
+	install -m 644 ${AUTOSTART} \
+		${DESTDIR}${ETCDIR}/xdg/autostart/${PROGRAM}.desktop
+	install -m 644 ${I3CONF} \
+		${DESTDIR}${SHAREDIR}/${PROGRAM}/i3.conf
 .for m in ${MANS}
 	gzip -cn man/${m}.1 > ${DESTDIR}${MANDIR}/${m}.1.gz
 .endfor
@@ -187,7 +201,7 @@ install: all
 clean:
 	rm -f ${PROGRAM} ${PANEL} ${PASSWD} bin/${START} ${MAN} \
 		${OBJS_PROGRAM} ${OBJS_PANEL} ${OBJS_PASSWD} \
-		${PREFIX_SUBR}
+		${PREFIX_SUBR} ${AUTOSTART} ${I3CONF}
 
 ################################################################################
 # END

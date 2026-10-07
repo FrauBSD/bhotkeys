@@ -2,7 +2,7 @@
 .\"
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
-.Dd October 3, 2026
+.Dd October 6, 2026
 .Dt BHOTKEYS-START 1
 .Os
 .Sh NAME
@@ -43,12 +43,18 @@ and does not wait to detect one.
 Without it, the listener detects the manager itself, waiting up
 to 30 seconds for one it knows.
 .It
-With
-.Ar manager ,
-runs that manager's apply script,
+Runs that manager's apply script,
 .Pa @PREFIX@/libexec/bhotkeys/bhotkeys- Ns Ar manager Ns Pa -apply ,
 in the background with
 .Fl Fl wait .
+With
+.Ar manager ,
+the name is the argument.
+Without it,
+.Nm bhotkeys Fl Fl print-wm
+waits up to 30 seconds for a manager the listener knows,
+and that name selects the script.
+A manager already running is found on the first scan.
 The script polls for the manager once a second for up to 30 seconds,
 then registers the listener's chords with it so the focused client
 does not see them.
@@ -83,13 +89,65 @@ for MATE:
 if [ ! "$DBUS_SESSION_BUS_ADDRESS" ]; then
 	eval "$( dbus-launch --sh-syntax --exit-with-session )"
 fi
-bhotkeys-start mate
 exec mate-session
 .Ed
 .Pp
 The bus lines stay in the session script.
 A child cannot export the address into the shell that runs the
 session, and the apply scripts for the GNOME family need it.
+.Pp
+GNOME, KDE, LXDE, LXQt, MATE, X-Cinnamon, and XFCE start
+.Nm
+from
+.Pa @PREFIX@/etc/xdg/autostart/bhotkeys.desktop
+when the session starts.
+That entry does not name a manager.
+The listener detects one, and the apply script for that name runs.
+.Pp
+i3 does not read that directory.
+Include
+.Pa @PREFIX@/share/bhotkeys/i3.conf
+from the i3 config:
+.Bd -literal -offset indent
+include @PREFIX@/share/bhotkeys/i3.conf
+.Ed
+.Pp
+.Cm bvwm ,
+.Cm dwm ,
+.Cm fluxbox ,
+.Cm fvwm ,
+.Cm openbox ,
+.Cm windowmaker ,
+and
+.Cm xmonad
+do not read that directory.
+.Cm fvwm
+is the name for the fvwm and fvwm3 programs.
+.Pp
+XDM runs
+.Pa ~/.xsession
+as the session.
+Name the manager, then replace the shell with the window manager:
+.Bd -literal -offset indent
+bhotkeys-start dwm
+exec dwm
+.Ed
+.Pp
+GDM and SDDM source
+.Pa ~/.xprofile
+and then run the session selected in the menu.
+Put the start line there:
+.Bd -literal -offset indent
+bhotkeys-start dwm
+.Ed
+.Pp
+SDDM also sources
+.Pa ~/.xsession
+before the selected session.
+An
+.Ic exec
+of the window manager in that file replaces the session SDDM was
+given.
 .Sh ENVIRONMENT
 .Bl -tag -width "DISPLAY"
 .It Ev DISPLAY
@@ -98,9 +156,17 @@ The default is
 .Pa :0 .
 .El
 .Sh FILES
-.Bl -tag -width "@PREFIX@/libexec/bhotkeys/" -compact
+.Bl -tag -width "@PREFIX@/etc/xdg/autostart/bhotkeys.desktop" -compact
 .It Pa @PREFIX@/libexec/bhotkeys/
 The apply scripts.
+.It Pa @PREFIX@/etc/xdg/autostart/bhotkeys.desktop
+Starts
+.Nm
+for GNOME, KDE, LXDE, LXQt, MATE, X-Cinnamon, and XFCE.
+.It Pa @PREFIX@/share/bhotkeys/i3.conf
+i3 config to include.
+Runs
+.Nm i3 .
 .El
 .Sh EXIT STATUS
 .Nm

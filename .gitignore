@@ -8,3 +8,6 @@ man/bhotkeys-passwd.1
 man/bhotkeys-start.1
 *.o
 libexec/bhotkeys-prefix.subr
+!share/bhotkeys/
+share/bhotkeys/i3.conf
+share/xdg/autostart/bhotkeys.desktop

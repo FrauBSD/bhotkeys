@@ -1,0 +1,2 @@
+# i3 does not read XDG autostart. Include this file; do not copy it.
+exec --no-startup-id @PREFIX@/bin/bhotkeys-start i3

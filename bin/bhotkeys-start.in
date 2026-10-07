@@ -9,14 +9,14 @@
 #
 # $Title: Start bhotkeys for an X session $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/bin/bhotkeys-start.in 2026-10-03 18:50:50 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/bin/bhotkeys-start.in 2026-10-06 22:02:09 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
 # One line for ~/.xsession or a window manager rc. Starts bosd through
 # bosd-start unless --no-bosd is given, starts the session listener,
-# and when a window manager is named, registers the listener's chords
-# with it once it is up.
+# and registers the listener's chords with the named manager, or with
+# the one detected when no name is given, once that manager is up.
 #
 # The listener keeps one instance per user. A listener already
 # running is left alone.
@@ -101,6 +101,12 @@ if [ "$wm" ]; then
 	find_apply "bhotkeys-$wm-apply" apply && "$apply" --wait &
 else
 	"$bh" --daemon &
+	# Detect the manager, then run its apply script
+	(
+		wm=$( "$bh" --print-wm ) || exit 0
+		find_apply "bhotkeys-$wm-apply" apply || exit 0
+		"$apply" --wait
+	) &
 fi
 
 ################################################################################

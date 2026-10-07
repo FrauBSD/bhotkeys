@@ -2,7 +2,7 @@
 .\"
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
-.Dd October 2, 2026
+.Dd October 6, 2026
 .Dt BHOTKEYS 1
 .Os
 .Sh NAME
@@ -18,6 +18,9 @@
 .Op Fl Fl greeter
 .Nm
 .Fl Fl print-keys Ar format
+.Op Fl Fl wm Ar name
+.Nm
+.Fl Fl print-wm
 .Op Fl Fl wm Ar name
 .Sh DESCRIPTION
 .Nm
@@ -165,6 +168,20 @@ A
 .Li listen 0
 plugin with no command only documents a key the window manager
 owns, and is not printed.
+.It Fl Fl print-wm
+Print the name of the running window manager, then exit.
+If none is running yet, wait up to 30 seconds.
+The name is the one
+.Fl Fl daemon
+uses for
+.Li enabled ,
+.Li chord ,
+and
+.Li session
+lines.
+When none appears in that time, exit 1.
+.Fl Fl wm
+prints that name without waiting.
 .It Fl Fl wm Ar name
 Treat
 .Ar name
@@ -510,6 +527,10 @@ It does not change the check box.
 .Bl -tag -width "BHOTKEYS_PLUGINS"
 .It Ev DISPLAY
 X server to watch.
+.It Ev BHOTKEYS_GREETER
+Set to
+.Li 1
+for a command run by the greeter listener.
 .It Ev BHOTKEYS_PLUGINS
 Extra plugin directory, scanned last.
 A file here replaces the same

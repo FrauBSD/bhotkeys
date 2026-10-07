@@ -453,7 +453,7 @@ bh_listen(struct bh_set *set)
 		return (1);
 	}
 	if (bh_greeter)
-		setenv("MENU_HOTKEYS_GREETER", "1", 1);
+		setenv("BHOTKEYS_GREETER", "1", 1);
 	if (!XRecordQueryVersion(bh_dpy, &major, &minor)) {
 		fprintf(stderr, "bhotkeys: no RECORD extension\n");
 		return (1);
