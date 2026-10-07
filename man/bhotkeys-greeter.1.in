@@ -1,0 +1,178 @@
+.\" Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd October 6, 2026
+.Dt BHOTKEYS-GREETER 1
+.Os
+.Sh NAME
+.Nm bhotkeys-greeter
+.Nd start and stop the login greeter listener
+.Sh SYNOPSIS
+.Nm
+.Cm start
+.Nm
+.Cm stop
+.Sh DESCRIPTION
+.Nm
+starts the greeter listener and stops it before the user
+session takes the display.
+The listener is
+.Nm bhotkeys Fl Fl daemon Fl Fl greeter .
+It does not share a process with the session listener.
+.Pp
+.Cm start
+also starts a system
+.Xr pulseaudio 1
+instance when that program is installed, so volume keys
+have a server before a user session exists, and runs
+.Xr bosd-start 1
+when it is on
+.Ev PATH .
+The PulseAudio daemon is started as root with
+.Fl Fl system
+and drops to user
+.Sy pulse .
+.Cm stop
+stops the listener, that PulseAudio instance, and the
+.Xr bosd 1
+daemon of the uid that ran
+.Cm start .
+Display managers run these hooks as root, so that daemon
+is the greeter's, not the session user's.
+.Pp
+.Cm start
+and
+.Cm stop
+exit 0.
+A missing program is logged and skipped.
+GDM aborts the login when
+.Pa PostLogin/Default
+exits non-zero, and
+.Xr pam_exec 8
+without
+.Cm optional
+turns a non-zero status into a failed session.
+.Pp
+The listener runs as root.
+Commands it runs are found on
+.Ev PATH .
+.Nm
+puts
+.Pa @PREFIX@/bin
+on that path.
+.Ev HOME
+for those commands is
+.Pa /root .
+.Pp
+User
+.Sy pulse
+must be in group
+.Sy audio
+or the OSS sinks do not open.
+.Nm
+does not change group membership.
+.Pp
+XDM and GDM each run a root script before the greeter and
+another when the user session is about to start.
+SDDM runs a root script before the greeter and has no root
+script at the handoff.
+The session PAM stack is root, and that is the stop.
+Do not use an XDG autostart entry for this.
+The greeter is not a user session.
+GDM's
+.Pa greeter/autostart
+directory runs as user
+.Sy gdm ,
+which is the wrong user for this listener.
+.Ss XDM
+.Pa Xsetup
+runs as root after the server accepts connections.
+.Pa GiveConsole
+runs as root before the session.
+.Bd -literal -offset indent
+# Xsetup
+\&. @PREFIX@/share/examples/bhotkeys/xdm/Xsetup
+
+# GiveConsole
+\&. @PREFIX@/share/examples/bhotkeys/xdm/GiveConsole
+.Ed
+.Ss GDM
+.Pa Init/Default
+runs as root after the server starts and before the
+greeter.
+GDM waits for it.
+.Pa PostLogin/Default
+runs as root after authentication and before
+.Fn pam_open_session .
+.Bd -literal -offset indent
+# Init/Default
+\&. @PREFIX@/share/examples/bhotkeys/gdm/Init
+
+# PostLogin/Default
+\&. @PREFIX@/share/examples/bhotkeys/gdm/PostLogin
+.Ed
+.Ss SDDM
+The X11
+.Va DisplayCommand
+.Pq Pa Xsetup
+runs as root before the greeter.
+Add the line in
+.Pa @PREFIX@/share/examples/bhotkeys/sddm/pam
+to the session group of
+.Pa pam.d/sddm
+and of
+.Pa pam.d/sddm-autologin .
+Leave
+.Pa pam.d/sddm-greeter
+alone.
+That stack is the greeter itself.
+.Xr pam_exec 8
+runs
+.Nm stop
+as root when the user session opens, and again when it
+closes.
+.Pa Xstop
+runs when the X server exits.
+On X11 that is logout, not the handoff.
+.Sh ENVIRONMENT
+.Bl -tag -width "PULSE_SERVER"
+.It Ev DISPLAY
+X server.
+The default is
+.Pa :0 .
+.It Ev XAUTHORITY
+Cookie file.
+When it is unset or unreadable,
+.Nm
+uses the XDM auth file for this display under
+.Pa /var/db/xdm/authdir/authfiles
+when one is readable.
+.It Ev PULSE_SERVER
+PulseAudio socket.
+The default is
+.Pa unix:/var/run/pulse/native .
+.El
+.Sh FILES
+.Bl -tag -width "@PREFIX@/share/bhotkeys/greeter-system.pa"
+.It Pa @PREFIX@/share/bhotkeys/greeter-system.pa
+Script for the system PulseAudio instance.
+.It Pa @PREFIX@/share/examples/bhotkeys/
+Snippets for XDM, GDM, and SDDM.
+.It Pa /var/run/bhotkeys-greeter.pid
+Listener pid.
+.It Pa /var/run/pulse/pid
+System PulseAudio pid.
+.El
+.Sh EXIT STATUS
+.Nm
+exits 1 when the arguments are wrong, and 0 otherwise.
+.Sh SEE ALSO
+.Xr bhotkeys 1 ,
+.Xr bhotkeys-start 1 ,
+.Xr bosd 1 ,
+.Xr bosd-start 1 ,
+.Xr pulseaudio 1 ,
+.Xr pam_exec 8
+.Sh AUTHORS
+.An Devin Teske Aq Mt dteske@FreeBSD.org

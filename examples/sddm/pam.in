@@ -1,0 +1,7 @@
+# Add this line to the session group of pam.d/sddm and of
+# pam.d/sddm-autologin. Do not add it to pam.d/sddm-greeter.
+# pam_exec runs it as root when the user session opens, and
+# again when the session closes. SDDM runs no root script of
+# its own between the greeter and the session. Xstop runs when
+# the X server exits, which is logout, not this handoff.
+session optional pam_exec.so @PREFIX@/bin/bhotkeys-greeter stop

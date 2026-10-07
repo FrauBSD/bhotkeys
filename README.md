@@ -1,4 +1,4 @@
-[//]: # ($FrauBSD: bhotkeys/README.md 2026-10-06 22:02:09 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/README.md 2026-10-07 12:10:30 -0700 Devin Teske $)
 
 # bhotkeys
 
@@ -182,6 +182,8 @@ The greeter gets the same treatment. A separate listener runs for
 the login screen with its own override file and a password on the
 list, so a laptop can take a screenshot or toggle airplane mode
 before anyone logs in, and a passer-by cannot rebind it.
+`bhotkeys-greeter` starts that listener for XDM, GDM, and SDDM,
+and stops it before the user session.
 
 ### Compared with the usual suspects
 

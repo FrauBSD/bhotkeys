@@ -1,0 +1,27 @@
+# Greeter system instance. Start as root with --system; the daemon
+# drops to user pulse. Stop it before the user session so that
+# session can open the devices.
+
+load-module module-device-restore
+load-module module-stream-restore
+load-module module-card-restore
+
+# Prefer OSS sinks on FreeBSD; module-detect often finds nothing.
+.nofail
+.ifexists module-udev-detect.so
+load-module module-udev-detect
+.else
+load-module module-detect
+.endif
+.ifexists module-devd-detect.so
+load-module module-devd-detect
+.endif
+.fail
+
+# Greeter pactl has no per-user cookie.
+load-module module-native-protocol-unix auth-anonymous=1
+
+load-module module-default-device-restore
+load-module module-always-sink
+load-module module-suspend-on-idle
+load-module module-position-event-sounds

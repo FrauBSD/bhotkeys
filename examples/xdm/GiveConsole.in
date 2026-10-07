@@ -1,0 +1,5 @@
+# Source from GiveConsole before the console is given to the user.
+#
+#   . @PREFIX@/share/examples/bhotkeys/xdm/GiveConsole
+#
+@PREFIX@/bin/bhotkeys-greeter stop

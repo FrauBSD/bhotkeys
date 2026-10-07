@@ -1,0 +1,5 @@
+# Source from Xsetup after DISPLAY and XAUTHORITY are set.
+#
+#   . @PREFIX@/share/examples/bhotkeys/xdm/Xsetup
+#
+@PREFIX@/bin/bhotkeys-greeter start

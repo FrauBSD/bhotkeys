@@ -175,6 +175,7 @@ exits 1 when
 is not found or the arguments are wrong, and 0 otherwise.
 .Sh SEE ALSO
 .Xr bhotkeys 1 ,
+.Xr bhotkeys-greeter 1 ,
 .Xr bosd 1 ,
 .Xr bosd-start 1
 .Sh AUTHORS

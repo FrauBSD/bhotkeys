@@ -1,0 +1,6 @@
+# Source from Init/Default. GDM runs that script as root after the
+# X server starts and before the greeter, and waits for it.
+#
+#   . @PREFIX@/share/examples/bhotkeys/gdm/Init
+#
+@PREFIX@/bin/bhotkeys-greeter start

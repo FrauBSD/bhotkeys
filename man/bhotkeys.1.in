@@ -101,6 +101,8 @@ The list opened for the greeter is read-only until its unlock
 password is entered.
 See
 .Xr bhotkeys-passwd 1 .
+.Xr bhotkeys-greeter 1
+starts and stops this listener.
 .It Fl Fl panel
 Open the chord list on the monitor under the pointer.
 The list process is
@@ -583,6 +585,7 @@ holds the lock.
 It exits non-zero when it cannot open the display or the Record
 extension is missing.
 .Sh SEE ALSO
+.Xr bhotkeys-greeter 1 ,
 .Xr bhotkeys-panel 1 ,
 .Xr bhotkeys-passwd 1 ,
 .Xr bhotkeys-start 1

@@ -2,7 +2,9 @@ bhotkeys
 bhotkeys-panel
 bhotkeys-passwd
 bin/bhotkeys-start
+bin/bhotkeys-greeter
 man/bhotkeys.1
+man/bhotkeys-greeter.1
 man/bhotkeys-panel.1
 man/bhotkeys-passwd.1
 man/bhotkeys-start.1
@@ -11,3 +13,9 @@ libexec/bhotkeys-prefix.subr
 !share/bhotkeys/
 share/bhotkeys/i3.conf
 share/xdg/autostart/bhotkeys.desktop
+examples/xdm/Xsetup
+examples/xdm/GiveConsole
+examples/gdm/Init
+examples/gdm/PostLogin
+examples/sddm/Xsetup
+examples/sddm/pam

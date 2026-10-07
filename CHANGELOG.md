@@ -1,10 +1,18 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-06 22:02:09 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-07 12:10:30 -0700 Devin Teske $)
 
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed
 in that tag (from the previous tag, or from the start of the
 repository for 1.0).
+
+## 1.3 (2026-10-06)
+
+- `bhotkeys-greeter` starts the greeter listener, a system Pulse
+  instance, and bosd, and stops them before the user session
+- XDM sources it from Xsetup and GiveConsole; GDM from Init and
+  PostLogin; SDDM from Xsetup, and from pam\_exec on the session
+  stack
 
 ## 1.2 (2026-10-06)
 

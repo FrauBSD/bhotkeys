@@ -1,0 +1,7 @@
+# Source from PostLogin/Default. GDM runs that script as root
+# after authentication and before pam_open_session. A non-zero
+# status aborts the session, so this file must succeed.
+#
+#   . @PREFIX@/share/examples/bhotkeys/gdm/PostLogin
+#
+@PREFIX@/bin/bhotkeys-greeter stop

@@ -1,0 +1,7 @@
+# Source from the X11 DisplayCommand, which is
+# @PREFIX@/share/sddm/scripts/Xsetup unless sddm.conf replaces it.
+# SDDM runs it as root before the greeter.
+#
+#   . @PREFIX@/share/examples/bhotkeys/sddm/Xsetup
+#
+@PREFIX@/bin/bhotkeys-greeter start

@@ -62,14 +62,6 @@ bh_panel_up(void)
 static void
 greeter_child_env(void)
 {
-	const char *home = getenv("HOME");
-	char path[512];
-
-	if (getenv("BOSD_PATH") == NULL && home != NULL && home[0] != '\0') {
-		if (snprintf(path, sizeof(path), "%s/theme/osd", home) <
-		    (int)sizeof(path))
-			setenv("BOSD_PATH", path, 0);
-	}
 	setenv("HOME", "/root", 1);
 	setenv("XDG_RUNTIME_DIR", "/var/run/xdg/root", 1);
 	setenv("BHOTKEYS_GREETER", "1", 1);

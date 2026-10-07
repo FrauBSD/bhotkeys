@@ -1,0 +1,309 @@
+#!/bin/sh
+############################################################ LICENSE
+#
+# Copyright (c) 2026 Devin Teske <dteske@FreeBSD.org>
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+############################################################ IDENT(1)
+#
+# $Title: Start and stop the bhotkeys greeter $
+# $Copyright: 2026 Devin Teske. All rights reserved. $
+# $FrauBSD: bhotkeys/bin/bhotkeys-greeter.in 2026-10-07 12:10:30 -0700 Devin Teske $
+#
+############################################################ INFORMATION
+#
+# Start the greeter listener, a system Pulse instance, and bosd,
+# then stop them before the user session starts. start and stop
+# both exit 0 so a display manager hook does not fail the login.
+#
+############################################################ ENVIRONMENT
+
+PATH="@PREFIX@/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+DISPLAY="${DISPLAY:-:0}"
+PULSE_SERVER="${PULSE_SERVER:-unix:/var/run/pulse/native}"
+export PATH DISPLAY PULSE_SERVER
+
+############################################################ GLOBALS
+
+pgm="${0##*/}" # Program basename
+
+#
+# Global exit status
+#
+SUCCESS=0
+FAILURE=1
+
+HOME=/root
+export HOME
+
+PA_SCRIPT="@PREFIX@/share/bhotkeys/greeter-system.pa"
+PIDF=/var/run/bhotkeys-greeter.pid
+
+############################################################ FUNCTIONS
+
+quietly() { "$@" > /dev/null 2>&1; }
+have() { quietly command -v "$@"; }
+
+log()
+{
+	logger -t "$pgm" -- "$@"
+}
+
+usage()
+{
+	exec >&2
+	echo "Usage: $pgm start"
+	echo "       $pgm stop"
+	exit $FAILURE
+}
+
+# XDM leaves the cookie under its auth dir. GDM and SDDM set
+# XAUTHORITY themselves.
+xdm_auth()
+{
+	local d f auth=
+
+	[ "$XAUTHORITY" ] && [ -r "$XAUTHORITY" ] && return $SUCCESS
+
+	d=${DISPLAY##*:}
+	d=${d%%.*}
+	[ "$d" ] || d=0
+	for f in /var/db/xdm/authdir/authfiles/A:"$d"-*; do
+		[ -r "$f" ] || continue
+		auth=$f
+	done
+	[ "$auth" ] || return $SUCCESS
+
+	XAUTHORITY=$auth
+	export XAUTHORITY
+}
+
+wait_display()
+{
+	local i=0
+
+	have xdpyinfo || return $SUCCESS
+	while [ "$i" -lt 50 ]; do
+		quietly xdpyinfo && return $SUCCESS
+		sleep 0.1
+		i=$(( $i + 1 ))
+	done
+	return $FAILURE
+}
+
+pulse_ok()
+{
+	have pactl || return $FAILURE
+	if have timeout; then
+		quietly timeout 1 pactl --server="$PULSE_SERVER" info
+	else
+		quietly pactl --server="$PULSE_SERVER" info
+	fi
+}
+
+pulse_in_audio()
+{
+	quietly id pulse || return $FAILURE
+	case " $( id -Gn pulse ) " in
+	*" audio "*) return $SUCCESS ;;
+	*) return $FAILURE
+	esac
+}
+
+stop_pid()
+{
+	local pid="$1"
+
+	[ "$pid" ] || return $SUCCESS
+	quietly kill -0 "$pid" || return $SUCCESS
+	quietly kill "$pid"
+	sleep 0.2
+	quietly kill -0 "$pid" && quietly kill -9 "$pid"
+}
+
+stop_listener()
+{
+	local pid=
+
+	[ -f "$PIDF" ] || return $SUCCESS
+	pid=$( cat "$PIDF" )
+	rm -f "$PIDF"
+	stop_pid "$pid"
+	rm -f /tmp/bhotkeys-greeter.lock
+}
+
+stop_pulse()
+{
+	local pid=
+
+	[ -f /var/run/pulse/pid ] || return $SUCCESS
+	pid=$( cat /var/run/pulse/pid )
+	stop_pid "$pid"
+	rm -f /var/run/pulse/native /var/run/pulse/pid
+}
+
+stop_bosd()
+{
+	local uid pidf pid=
+
+	uid=$( id -u )
+	pidf=/tmp/bosd.default.$uid.pid
+	[ -f "$pidf" ] || return $SUCCESS
+	pid=$( cat "$pidf" )
+	stop_pid "$pid"
+	rm -f "$pidf" "/tmp/bosd.default.$uid.sock"
+}
+
+load_oss_sinks()
+{
+	local u sink n=0 def first
+
+	have pactl || return $SUCCESS
+	[ -r /dev/sndstat ] || return $SUCCESS
+	for u in $( awk '
+		/^pcm[0-9]+:/ {
+			id = $1
+			sub(/^pcm/, "", id)
+			sub(/:.*/, "", id)
+			if ($0 ~ /\(play/)
+				print id
+		}
+	' /dev/sndstat ); do
+		sink=oss_output.dsp$u
+		if pactl --server="$PULSE_SERVER" list short sinks \
+			2> /dev/null | awk -v s="$sink" '
+				$2 == s { found = 1 } END { exit !found }
+			' # END-QUOTE
+		then
+			n=$(( $n + 1 ))
+			continue
+		fi
+		if quietly pactl --server="$PULSE_SERVER" load-module \
+			module-oss \
+			device="/dev/dsp$u" \
+			sink_name="$sink" \
+			source_name="oss_input.dsp$u"
+		then
+			n=$(( $n + 1 ))
+			log "loaded $sink"
+		else
+			log "module-oss failed for dsp$u"
+		fi
+	done
+	def=$( pactl --server="$PULSE_SERVER" \
+		get-default-sink 2> /dev/null ) || def=
+	case "$def" in
+	auto_null|null|*null*)
+		first=$( pactl --server="$PULSE_SERVER" \
+			list short sinks 2> /dev/null |
+			awk '$2 ~ /^oss_output\.dsp/ { print $2; exit }' )
+		[ "$first" ] || return $SUCCESS
+		quietly pactl --server="$PULSE_SERVER" \
+			set-default-sink "$first"
+		log "default sink $first"
+		;;
+	esac
+	log "oss sinks $n"
+}
+
+ensure_pulse()
+{
+	local i=0 noss
+
+	have pulseaudio || return $SUCCESS
+	if ! quietly id pulse; then
+		log "no user pulse"
+		return $SUCCESS
+	fi
+	[ -f "$PA_SCRIPT" ] || return $SUCCESS
+	pulse_in_audio || log "user pulse is not in group audio"
+	if pulse_ok; then
+		noss=$( pactl --server="$PULSE_SERVER" \
+			list short sinks 2> /dev/null | awk '
+				$2 ~ /^oss_output\.dsp/ { n++ }
+				END { print int(n) }
+			' )
+		if [ "${noss:-0}" -gt 0 ]; then
+			load_oss_sinks
+			return $SUCCESS
+		fi
+		log "system pulse has no OSS sinks"
+		stop_pulse
+	fi
+	log "starting system pulse"
+	if ! pulseaudio --system --daemonize=true \
+		--log-target=syslog --exit-idle-time=-1 \
+		-nF "$PA_SCRIPT"
+	then
+		log "pulseaudio --system failed"
+		return $SUCCESS
+	fi
+	while [ "$i" -lt 40 ]; do
+		pulse_ok && break
+		sleep 0.1
+		i=$(( $i + 1 ))
+	done
+	if ! pulse_ok; then
+		log "system pulse did not answer"
+		return $SUCCESS
+	fi
+	load_oss_sinks
+}
+
+start_listener()
+{
+	local pid
+
+	quietly nohup bhotkeys --daemon --greeter &
+	pid=$!
+	echo "$pid" > "$PIDF"
+	sleep 0.3
+	if quietly kill -0 "$pid"; then
+		log "listener $pid"
+		return $SUCCESS
+	fi
+	log "listener exited"
+	rm -f "$PIDF"
+}
+
+start_bosd()
+{
+	have bosd-start || return $SUCCESS
+	bosd-start
+}
+
+cmd_stop()
+{
+	stop_listener
+	stop_pulse
+	stop_bosd
+	log "stopped"
+}
+
+cmd_start()
+{
+	xdm_auth
+	if ! wait_display; then
+		log "no display"
+		return $SUCCESS
+	fi
+	stop_listener
+	ensure_pulse
+	start_listener
+	start_bosd
+}
+
+############################################################ MAIN
+
+case "$1" in
+start) cmd_start ;;
+stop) cmd_stop ;;
+*) usage # NOTREACHED
+esac
+
+exit $SUCCESS
+
+################################################################################
+# END
+################################################################################
