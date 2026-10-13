@@ -2,7 +2,7 @@
 .\"
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
-.Dd October 6, 2026
+.Dd October 13, 2026
 .Dt BHOTKEYS-GREETER 1
 .Os
 .Sh NAME
@@ -91,10 +91,10 @@ runs as root after the server accepts connections.
 .Pa GiveConsole
 runs as root before the session.
 .Bd -literal -offset indent
-# Xsetup
+# Add to @PREFIX@/etc/X11/xdm/Xsetup_0
 \&. @PREFIX@/share/examples/bhotkeys/xdm/Xsetup
 
-# GiveConsole
+# Add to @PREFIX@/etc/X11/xdm/GiveConsole
 \&. @PREFIX@/share/examples/bhotkeys/xdm/GiveConsole
 .Ed
 .Ss GDM

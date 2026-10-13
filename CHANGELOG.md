@@ -1,10 +1,15 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-07 12:10:30 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-13 12:06:44 -0700 Devin Teske $)
 
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed
 in that tag (from the previous tag, or from the start of the
 repository for 1.0).
+
+## 1.4 (2026-10-13)
+
+- Update XDM examples and XDM section in bhotkeys-greeter(1) to
+  provide the typical location of Xsetup/GiveConsole files
 
 ## 1.3 (2026-10-06)
 

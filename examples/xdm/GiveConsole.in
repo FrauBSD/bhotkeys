@@ -2,4 +2,6 @@
 #
 #   . @PREFIX@/share/examples/bhotkeys/xdm/GiveConsole
 #
+# NB: GiveConsole is typically at @PREFIX@/etc/X11/xdm/GiveConsole
+#
 @PREFIX@/bin/bhotkeys-greeter stop
