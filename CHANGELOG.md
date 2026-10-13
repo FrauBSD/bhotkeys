@@ -1,4 +1,4 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-13 12:06:44 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-13 13:37:08 -0700 Devin Teske $)
 
 # Changelog
 
@@ -10,6 +10,10 @@ repository for 1.0).
 
 - Update XDM examples and XDM section in bhotkeys-greeter(1) to
   provide the typical location of Xsetup/GiveConsole files
+- Add a Listener checkbox to the panel footer to allow toggling
+  overall functionality (both to facilitate quick comparison of
+  default window manager functionality versus bhothkeys as well
+  as quick-disable to prevent distraction during certain games)
 
 ## 1.3 (2026-10-06)
 

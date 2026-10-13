@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/sysctl.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -202,11 +203,55 @@ retarget(Display *dpy, int scr, Window *win, XftDraw **draw, Visual *vis,
 	panel_pidfile(1);
 }
 
+/*
+ * The greeter daemon is this panel's parent. The bit lives in that
+ * process. SIGUSR1 turns it off, SIGUSR2 turns it on.
+ */
+static void
+tell_greeter(int on)
+{
+	int mib[4];
+	char path[256];
+	size_t len = sizeof(path);
+	const char *base;
+	pid_t pp = getppid();
+
+	if (pp <= 1)
+		return;
+	mib[0] = CTL_KERN;
+	mib[1] = KERN_PROC;
+	mib[2] = KERN_PROC_PATHNAME;
+	mib[3] = pp;
+	if (sysctl(mib, 4, path, &len, NULL, 0) != 0)
+		return;
+	base = strrchr(path, '/');
+	base = base != NULL ? base + 1 : path;
+	if (strcmp(base, "bhotkeys") != 0)
+		return;
+	kill(pp, on ? SIGUSR2 : SIGUSR1);
+}
+
 static void
 handle_hit(Display *dpy, int scr, Window *winp, XftDraw **drawp,
     Visual *vis, Colormap cmap, int what, int row)
 {
 	if (panel_pw_click(dpy, *winp, &ui, what))
+		return;
+	if (what == HIT_LISTENER) {
+		set.listener_on = !set.listener_on;
+		if (!set.listener_on && ui.capture != -2) {
+			ui.capture = -2;
+			panel_capture(0);
+			XUngrabKeyboard(dpy, CurrentTime);
+		}
+		if (bh_greeter)
+			tell_greeter(set.listener_on);
+		else
+			panel_save(&ui);
+		return;
+	}
+	if (!set.listener_on && row >= 0 &&
+	    (what == HIT_CHECK || what == HIT_SET || what == HIT_RESET))
 		return;
 	if (what == HIT_MANAGE) {
 		retarget(dpy, scr, winp, drawp, vis, cmap);
@@ -274,6 +319,12 @@ main(int argc, char **argv)
 		return (1);
 	bh_dpy = dpy;
 	bh_load(&set);
+	if (bh_greeter) {
+		const char *held = getenv("BHOTKEYS_LISTENER");
+
+		if (held != NULL && strcmp(held, "0") == 0)
+			set.listener_on = 0;
+	}
 	ui.set = &set;
 	panel_ui_load(&ui);
 	panel_refilter(&ui);

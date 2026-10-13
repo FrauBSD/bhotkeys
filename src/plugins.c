@@ -322,6 +322,7 @@ bh_load(struct bh_set *set)
 	bh_set_clear(set);
 	set->panel_on = 1;
 	set->panel_alt_on = 1;
+	set->listener_on = 1;
 	strlcpy(set->panel_chord, BH_PANEL_CHORD, sizeof(set->panel_chord));
 	strlcpy(set->panel_alt_chord, BH_PANEL_ALT_CHORD,
 	    sizeof(set->panel_alt_chord));

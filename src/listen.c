@@ -57,6 +57,18 @@ on_signal(int sig __unused)
 	_exit(0);
 }
 
+static void
+on_listen_off(int sig __unused)
+{
+	bh_greeter_listen = 0;
+}
+
+static void
+on_listen_on(int sig __unused)
+{
+	bh_greeter_listen = 1;
+}
+
 static long
 tv_diff_ms(const struct timeval *a, const struct timeval *b)
 {
@@ -445,6 +457,10 @@ bh_listen(struct bh_set *set)
 	signal(SIGINT, on_signal);
 	signal(SIGHUP, on_signal);
 	signal(SIGCHLD, SIG_DFL);
+	if (bh_greeter) {
+		signal(SIGUSR1, on_listen_off);
+		signal(SIGUSR2, on_listen_on);
+	}
 
 	bh_dpy = XOpenDisplay(NULL);
 	dpy_data = XOpenDisplay(NULL);

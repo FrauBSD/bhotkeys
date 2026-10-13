@@ -127,6 +127,39 @@ draw_x(Display *dpy, Window win, GC gc, int x, int y, int s)
 	XSetLineAttributes(dpy, gc, 0, LineSolid, CapButt, JoinMiter);
 }
 
+/*
+ * Right side of the footer: [x] Listener | Window
+ * The greeter has the lock in place of Window. The pipe is the
+ * gap between the two controls.
+ */
+static void
+foot_place(Display *dpy, XftFont *small, struct panel_ui *ui)
+{
+	const char *mode;
+	int box_w, gap, lab_w, sep_w, mode_w, x;
+
+	box_w = panel_text_w(dpy, small, "[", 1) +
+	    panel_text_w(dpy, small, "x", 1) +
+	    panel_text_w(dpy, small, "]", 1);
+	gap = panel_text_w(dpy, small, " ", 1);
+	if (gap < 4)
+		gap = 4;
+	lab_w = panel_text_w(dpy, small, "Listener", -1);
+	sep_w = panel_text_w(dpy, small, " | ", -1);
+	if (bh_greeter)
+		mode_w = ui->search_h;
+	else {
+		mode = ui->managed ? "Overlay" : "Window";
+		mode_w = panel_text_w(dpy, small, mode, -1);
+	}
+	x = ui->win_w - 14 - (box_w + gap + lab_w + sep_w + mode_w);
+	if (x < 14)
+		x = 14;
+	ui->foot_listen_x = x;
+	ui->foot_listen_x2 = x + box_w + gap + lab_w;
+	ui->foot_mode_x = ui->foot_listen_x2 + sep_w;
+}
+
 void
 panel_paint(Display *dpy, Window win, XftDraw *draw, XftFont *font,
     XftFont *small, XftColor *fg, XftColor *dim, XftColor *accent,
@@ -286,6 +319,10 @@ panel_paint(Display *dpy, Window win, XftDraw *draw, XftFont *font,
 		char lines[6][120];
 		int nlines, li;
 		const struct bh_plugin *p = NULL;
+		int frozen = !ui->set->listener_on && idx >= 0;
+		XftColor *namec = frozen ? dim : fg;
+		XftColor *chordc = frozen ? dim : accent;
+		XftColor *actc = (frozen || !mark) ? dim : accent;
 
 		if (sy + ui->lay_h[i] < ui->body_y ||
 		    sy >= ui->body_y + ui->body_h)
@@ -321,9 +358,10 @@ panel_paint(Display *dpy, Window win, XftDraw *draw, XftFont *font,
 			XDrawLine(dpy, win, gc, 12, sy + ui->lay_h[i] - 4,
 			    ui->win_w - 12, sy + ui->lay_h[i] - 4);
 		if (!ui->readonly && idx >= 0)
-			draw_check(dpy, draw, fg, font, 18, base, p->enabled);
+			draw_check(dpy, draw, namec, font, 18, base,
+			    p->enabled);
 		else if (!ui->readonly && idx == ROW_ALT)
-			draw_check(dpy, draw, fg, font, 18, base,
+			draw_check(dpy, draw, namec, font, 18, base,
 			    ui->set->panel_alt_on);
 		{
 			char names[4][120];
@@ -337,18 +375,17 @@ panel_paint(Display *dpy, Window win, XftDraw *draw, XftFont *font,
 			clip(draw, ui->name_x, ui->body_y,
 			    ui->chord_x - ui->name_x - 8, ui->body_h);
 			for (ti = 0; ti < nt; ti++)
-				text(draw, fg, font, ui->name_x,
+				text(draw, namec, font, ui->name_x,
 				    base + ti * (font->ascent + font->descent),
 				    names[ti]);
 		}
 		clip(draw, ui->chord_x, ui->body_y,
 		    ui->act_x - ui->chord_x - 8, ui->body_h);
-		text(draw, accent, small, ui->chord_x,
+		text(draw, chordc, small, ui->chord_x,
 		    base - (font->ascent - small->ascent) / 2, pretty);
 		clip(draw, 0, ui->body_y, ui->win_w, ui->body_h);
 		if (!ui->readonly) {
-			text(draw, mark ? accent : dim, small, ui->act_x, base,
-			    "Set keys");
+			text(draw, actc, small, ui->act_x, base, "Set keys");
 			if (idx == ROW_PANEL) {
 				if (strcmp(ui->set->panel_chord,
 				    BH_PANEL_CHORD) != 0 &&
@@ -409,28 +446,49 @@ panel_paint(Display *dpy, Window win, XftDraw *draw, XftFont *font,
 		foot = "Enter unlocks. Escape cancels.";
 	else if (bh_greeter && ui->readonly)
 		foot = "Locked. The lock makes this list writable.";
+	else if (!ui->set->listener_on)
+		foot = "Listener is off. Panel chords still open this list.";
 	else
 		foot = "Esc to close. Check enables." \
 		    " Set keys, then press the chord. Reset restores it.";
+	foot_place(dpy, small, ui);
 	{
-		int clip_w = bh_greeter ? ui->win_w - ui->search_h - 40 :
-		    ui->win_w - 150;
+		int clip_w = ui->foot_listen_x - 20;
 
+		if (clip_w < 40)
+			clip_w = 40;
 		clip(draw, 12, ui->footer_y, clip_w, ui->footer_h);
 	}
 	text(draw, dim, small, 14, ui->footer_y + small->ascent + 8, foot);
 	XftDrawSetClip(draw, NULL);
-	if (bh_greeter) {
-		int side = ui->search_h;
-		int lx = ui->win_w - 14 - side;
-		int ly = ui->footer_y + (ui->footer_h - side) / 2;
+	{
+		int base = ui->footer_y + small->ascent + 8;
+		int lab_w = panel_text_w(dpy, small, "Listener", -1);
 
+		draw_check(dpy, draw, fg, small, ui->foot_listen_x, base,
+		    ui->set->listener_on);
+		text(draw, fg, small, ui->foot_listen_x2 - lab_w, base,
+		    "Listener");
+		text(draw, fg, small, ui->foot_listen_x2, base, " | ");
+	}
+	if (bh_greeter) {
+		int base = ui->footer_y + small->ascent + 8;
+		int side = ui->search_h;
+		int t = side / 8;
+
+		if (t < 2)
+			t = 2;
+		/* Body bottom is y + side - t. Park that on text baseline */
+		ui->foot_lock_y = base - (side - t);
 		XSetForeground(dpy, gc, accent->pixel);
-		draw_lock(dpy, win, gc, lx, ly, side, ui->readonly);
-	} else
-		text(draw, accent, small, ui->win_w - 120,
-		    ui->footer_y + small->ascent + 8,
-		    ui->managed ? "Overlay" : "Window");
+		draw_lock(dpy, win, gc, ui->foot_mode_x, ui->foot_lock_y,
+		    side, ui->readonly);
+	} else {
+		int base = ui->footer_y + small->ascent + 8;
+		const char *mode = ui->managed ? "Overlay" : "Window";
+
+		text(draw, accent, small, ui->foot_mode_x, base, mode);
+	}
 	if (pm != None) {
 		XCopyArea(dpy, pm, onscreen, gc, 0, 0, (unsigned)ui->win_w,
 		    (unsigned)ui->win_h, 0, 0);
@@ -454,11 +512,17 @@ panel_hit(struct panel_ui *ui, int x, int y, int *row)
 	if (y >= ui->search_y && y < ui->search_y + ui->search_h &&
 	    x >= ui->search_x && x < ui->search_x + ui->search_w)
 		return (HIT_SEARCH);
+	if (bh_greeter && y >= ui->foot_lock_y &&
+	    y < ui->foot_lock_y + ui->search_h &&
+	    x >= ui->foot_mode_x && x < ui->foot_mode_x + ui->search_h)
+		return (HIT_UNLOCK);
 	if (y >= ui->footer_y) {
-		if (bh_greeter && x >= ui->win_w - 14 - ui->search_h)
+		if (bh_greeter && x >= ui->foot_mode_x)
 			return (HIT_UNLOCK);
-		if (!bh_greeter && x >= ui->win_w - 180)
+		if (!bh_greeter && x >= ui->foot_mode_x)
 			return (HIT_MANAGE);
+		if (x >= ui->foot_listen_x && x < ui->foot_listen_x2)
+			return (HIT_LISTENER);
 		return (HIT_NONE);
 	}
 	if (y >= ui->header_y && y < ui->header_y + ui->header_h) {
@@ -481,6 +545,8 @@ panel_hit(struct panel_ui *ui, int x, int y, int *row)
 			return (HIT_NONE);
 		*row = idx;
 		if (ui->readonly)
+			return (HIT_NONE);
+		if (!ui->set->listener_on && idx >= 0)
 			return (HIT_NONE);
 		if (idx == ROW_PANEL) {
 			if (x >= ui->act_x && x < ui->reset_x)

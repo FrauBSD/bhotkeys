@@ -16,6 +16,7 @@
 #define HIT_UNLOCK	8
 #define HIT_OUT		9
 #define HIT_CLOSE	10
+#define HIT_LISTENER	11
 
 int	panel_admin(int argc, char **argv, int *status);
 
@@ -54,6 +55,10 @@ struct panel_ui {
 	int	body_h;
 	int	footer_y;
 	int	footer_h;
+	int	foot_listen_x;	/* left of the footer Listener check */
+	int	foot_listen_x2;	/* right of the word Listener */
+	int	foot_mode_x;	/* left of Window or Overlay */
+	int	foot_lock_y;	/* greeter lock top; body on text baseline */
 	int	name_x;
 	int	chord_x;
 	int	act_x;

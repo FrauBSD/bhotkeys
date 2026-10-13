@@ -144,6 +144,12 @@ pass(const struct bh_set *set, int unbinds)
 		act = action_of(p);
 		if (act == NULL)
 			continue;
+		/*
+		 * Listener off releases every plugin chord. The panel
+		 * chords below stay. The checkbox is not rewritten.
+		 */
+		if (!set->listener_on)
+			act = ACT_UNBIND;
 		if ((strcmp(act, ACT_UNBIND) == 0) != unbinds)
 			continue;
 		emit(p->ks, p->need_super, p->need_ctrl, p->need_alt,

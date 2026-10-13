@@ -95,6 +95,18 @@ bh_apply_overrides(struct bh_set *set)
 			    sizeof(set->panel_alt_chord));
 			continue;
 		}
+		/*
+		 * Not a plugin. The chord field is a dash so the line
+		 * still parses. It does not rewrite any checkbox.
+		 *
+		 * The greeter toggle is for this screen only. A line
+		 * left in the greeter file does not apply.
+		 */
+		if (strcmp(id, BH_LISTENER_ID) == 0) {
+			if (!bh_greeter)
+				set->listener_on = enabled ? 1 : 0;
+			continue;
+		}
 		for (i = 0; i < set->n; i++) {
 			if (strcmp(set->at[i]->id, id) != 0)
 				continue;
@@ -143,6 +155,8 @@ write_current(FILE *fp, const struct bh_set *set, const char *wm)
 		    set->panel_on ? 1 : 0, set->panel_chord, wm);
 		fprintf(fp, "%s %d %s %s\n", BH_PANEL_ALT_ID,
 		    set->panel_alt_on ? 1 : 0, set->panel_alt_chord, wm);
+		fprintf(fp, "%s %d - %s\n", BH_LISTENER_ID,
+		    set->listener_on ? 1 : 0, wm);
 	} else {
 		fprintf(fp, "%s %d %s\n", BH_PANEL_ID,
 		    set->panel_on ? 1 : 0, set->panel_chord);

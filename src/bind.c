@@ -160,6 +160,8 @@ bh_panel_open(const struct bh_set *set, KeySym ks, int super, int mod4)
 	return (same_key(ks, set->panel_alt_ks));
 }
 
+volatile sig_atomic_t bh_greeter_listen = 1;
+
 int
 bh_match(const struct bh_set *set, KeySym ks, int super, unsigned int state,
     const struct bh_plugin **out)
@@ -171,6 +173,10 @@ bh_match(const struct bh_set *set, KeySym ks, int super, unsigned int state,
 	int ctrl = (state & ControlMask) != 0;
 
 	*out = NULL;
+	if (!set->listener_on)
+		return (0);
+	if (bh_greeter && !bh_greeter_listen)
+		return (0);
 	for (p = set->chord[chord_slot(ks)]; p != NULL; p = p->chord_next) {
 		if (!p->enabled || !p->listen || p->ks == NoSymbol)
 			continue;

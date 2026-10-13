@@ -205,7 +205,12 @@ bh_print_keys(const struct bh_set *set, const char *format)
 
 		if (!p->session_ok)
 			continue;
-		row(f, &seen, p->id, p->listen, p->enabled, p->ks,
+		/*
+		 * Listener off leaves the check as saved and prints
+		 * the row disabled, so the helper releases the grab.
+		 */
+		row(f, &seen, p->id, p->listen,
+		    set->listener_on ? p->enabled : 0, p->ks,
 		    p->need_super, p->need_ctrl, p->need_alt, p->need_shift,
 		    p->label);
 	}

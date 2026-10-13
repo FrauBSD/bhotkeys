@@ -184,6 +184,8 @@ bh_run_panel(void)
 		return (-1);
 	if (pid != 0)
 		return (0);
+	if (bh_greeter)
+		setenv("BHOTKEYS_LISTENER", bh_greeter_listen ? "1" : "0", 1);
 	argv[0] = "bhotkeys-panel";
 	argv[1] = bh_greeter ? "--greeter" : "--session";
 	argv[2] = NULL;

@@ -1,6 +1,7 @@
 #ifndef BHOTKEYS_H
 #define BHOTKEYS_H
 
+#include <signal.h>
 #include <stdio.h>
 
 #include <X11/Xlib.h>
@@ -23,6 +24,7 @@
 #define BH_PANEL_CHORD		"Super+question"
 #define BH_PANEL_ALT_ID		"panel-alt"
 #define BH_PANEL_ALT_CHORD	"Super+slash"
+#define BH_LISTENER_ID		"listener"
 
 struct bh_plugin {
 	char	id[BH_ID_MAX];
@@ -62,6 +64,7 @@ struct bh_set {
 	int	panel_alt_super;
 	int	panel_on;	/* 0: Super+? does not open the list */
 	int	panel_alt_on;	/* 0: Super+/ does not open the list */
+	int	listener_on;	/* 0: panel chords only; checks stay saved */
 };
 
 extern int		bh_greeter;
@@ -97,6 +100,12 @@ int	bh_chord_parse(const char *chord, KeySym *ks, int *need_super,
 	    int *need_alt, int *need_shift, int *need_ctrl);
 int	bh_match(const struct bh_set *set, KeySym ks, int super,
 	    unsigned int state, const struct bh_plugin **out);
+
+/*
+ * Greeter only. The daemon's own memory. 1 until this process is
+ * signaled. A new greeter starts at 1.
+ */
+extern volatile sig_atomic_t bh_greeter_listen;
 int	bh_panel_chord(const struct bh_set *set, KeySym ks, int super,
 	    int mod4);
 int	bh_panel_open(const struct bh_set *set, KeySym ks, int super,

@@ -91,9 +91,13 @@ metrics(struct panel_ui *ui)
 	if (bh_greeter)
 		ui->search_w = ui->win_w - ui->search_h - 42;
 	ui->header_h = ui->font_px + 16;
+	ui->foot_listen_x = ui->win_w;
+	ui->foot_listen_x2 = ui->win_w;
+	ui->foot_mode_x = ui->win_w;
 	ui->footer_h = ui->font_px + 26;
 	ui->header_y = ui->search_y + ui->search_h + 12;
 	ui->footer_y = ui->win_h - ui->footer_h;
+	ui->foot_lock_y = ui->footer_y;
 	/*
 	 * The scroll marks sit in this gap. Rows start below the upper
 	 * one and stop above the lower one.
