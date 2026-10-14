@@ -5,9 +5,10 @@
  */
 
 /*
- * Which rows the list shows, in which order. No column chosen means
- * alphabetical by the group string, then by name. A heading is that
- * string, as written in the plugin file.
+ * Which rows the list shows, in which order. Panel and Panel alt
+ * stay first. No column chosen means alphabetical by the group
+ * string, then by name. A heading is that string, as written in
+ * the plugin file.
  */
 
 #include <ctype.h>
@@ -81,12 +82,34 @@ row_group(struct panel_ui *ui, int idx)
 	return (ui->set->at[idx]->group);
 }
 
+/*
+ * Panel, then Panel alt, above every plugin. A reversed column
+ * does not move them.
+ */
+static int
+cmp_pin(int a, int b)
+{
+	int ap = a < 0;
+	int bp = b < 0;
+
+	if (!ap && !bp)
+		return (0);
+	if (ap != bp)
+		return (ap ? -1 : 1);
+	if (a == b)
+		return (0);
+	return (a == ROW_PANEL ? -1 : 1);
+}
+
 static int
 cmp_row(struct panel_ui *ui, int a, int b)
 {
 	char pa[BH_CHORD_MAX], pb[BH_CHORD_MAX];
 	int c;
 
+	c = cmp_pin(a, b);
+	if (c != 0)
+		return (c);
 	if (ui->sort_col == 1) {
 		bh_chord_pretty(row_chord(ui, a), pa, sizeof(pa));
 		bh_chord_pretty(row_chord(ui, b), pb, sizeof(pb));
@@ -105,6 +128,9 @@ cmp_natural(struct panel_ui *ui, int a, int b)
 {
 	int c;
 
+	c = cmp_pin(a, b);
+	if (c != 0)
+		return (c);
 	c = strcasecmp(row_group(ui, a), row_group(ui, b));
 	if (c != 0)
 		return (c);

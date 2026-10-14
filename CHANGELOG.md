@@ -1,4 +1,4 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-14 16:20:46 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-14 16:26:05 -0700 Devin Teske $)
 
 # Changelog
 
@@ -22,6 +22,7 @@ repository for 1.0).
   the session panel
 - Make close X present on session panel (as-in greeter panel)
 - Fix characters leaking to display manager in greeter panel
+- Always place built-in Panel entries at top of panel list
 
 ## 1.3 (2026-10-06)
 
