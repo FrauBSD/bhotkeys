@@ -63,8 +63,12 @@ panel_ui_load(struct panel_ui *ui)
 	char path[512], line[64];
 	int v;
 
-	if (bh_greeter)
-		return;
+	/*
+	 * No column chosen is group, then name. A saved line may
+	 * replace that. Zero would be the Name column, ascending.
+	 */
+	ui->sort_col = -1;
+	ui->sort_rev = 0;
 	ui_path(path, sizeof(path));
 	fp = fopen(path, "r");
 	if (fp == NULL)
@@ -95,8 +99,6 @@ panel_ui_save(const struct panel_ui *ui)
 	char path[512], dir[512];
 	const char *home = getenv("HOME");
 
-	if (bh_greeter)
-		return;
 	if (home == NULL || home[0] == '\0')
 		home = "/tmp";
 	snprintf(dir, sizeof(dir), "%s/.config", home);

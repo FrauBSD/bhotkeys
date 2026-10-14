@@ -1,4 +1,4 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-13 13:37:08 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-14 11:06:46 -0700 Devin Teske $)
 
 # Changelog
 
@@ -14,6 +14,10 @@ repository for 1.0).
   overall functionality (both to facilitate quick comparison of
   default window manager functionality versus bhothkeys as well
   as quick-disable to prevent distraction during certain games)
+- Fix incorrect default sort order. Should be category-then-
+  alphabetic instead of alphabetic
+- Add support for remembering scroll position and sort order in
+  greeter mode
 
 ## 1.3 (2026-10-06)
 
