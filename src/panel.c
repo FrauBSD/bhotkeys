@@ -36,6 +36,35 @@ on_term(int sig __unused)
 
 static int xerr(Display *d, XErrorEvent *e) { (void)d; (void)e; return (0); }
 
+static Window login_win;
+
+static void
+note_login(Display *dpy)
+{
+	Window w;
+	int rev;
+
+	if (!bh_greeter || login_win != None)
+		return;
+	XGetInputFocus(dpy, &w, &rev);
+	if (w != None && w != PointerRoot)
+		login_win = w;
+}
+
+static void
+restore_login(Display *dpy)
+{
+	if (!bh_greeter || login_win == None)
+		return;
+	/*
+	 * The login widget set this focus when it was drawn, and it
+	 * does not take it back on its own. Put it back before our
+	 * window goes away.
+	 */
+	XSetInputFocus(dpy, login_win, RevertToPointerRoot, CurrentTime);
+	XSync(dpy, False);
+}
+
 static void
 panel_pidfile(int on)
 {
@@ -160,8 +189,7 @@ make_win(Display *dpy, int scr, int managed)
 static void
 focus_win(Display *dpy, Window win)
 {
-	if (!bh_greeter)
-		XSetInputFocus(dpy, win, RevertToPointerRoot, CurrentTime);
+	XSetInputFocus(dpy, win, RevertToPointerRoot, CurrentTime);
 }
 
 static void
@@ -342,6 +370,7 @@ main(int argc, char **argv)
 	panel_refilter(&ui);
 	XSetErrorHandler(xerr);
 	scr = DefaultScreen(dpy);
+	note_login(dpy);
 	cmap = DefaultColormap(dpy, scr);
 	vis = DefaultVisual(dpy, scr);
 	shade = make_shade(dpy, scr);
@@ -562,6 +591,7 @@ main(int argc, char **argv)
 	panel_ui_save(&ui);
 	panel_capture(0);
 	panel_pidfile(0);
+	restore_login(dpy);
 	XCloseDisplay(dpy);
 	return (0);
 }

@@ -5,8 +5,9 @@
  */
 
 /*
- * xlogin holds the keyboard. RECORD sees the press without taking
- * the grab or the focus; xlogin does not accept either back.
+ * xdm holds the keyboard for the whole greet. RECORD sees the press
+ * without taking that grab. The panel moves focus off the login
+ * widget while it is up, and puts it back on exit.
  * The callback only queues. Key handling runs after the reply
  * read, so a round trip cannot stall the server.
  */

@@ -25,10 +25,15 @@ panel_keys_hold(Display *dpy, Window win, Time t)
 	if (!bh_greeter || win == None)
 		return;
 	/*
-	 * Do not grab the keyboard or move the focus. xlogin does not
-	 * take either back, and the greeter stays dead until the
-	 * display is reset. RECORD feeds the list without taking them.
+	 * xdm SecureDisplay grabs the keyboard on the root for the
+	 * whole greet and never releases it. owner_events is True, so
+	 * a key is delivered to the login widget while that widget has
+	 * focus, and another client's grab is AlreadyGrabbed. Focus on
+	 * this window makes the grab deliver to the root instead, so
+	 * the prompt stays empty. The login widget is given focus back
+	 * when the panel exits. RECORD still feeds the list.
 	 */
+	XSetInputFocus(dpy, win, RevertToPointerRoot, CurrentTime);
 	panel_below_osk(dpy, win);
 }
 

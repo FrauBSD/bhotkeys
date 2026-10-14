@@ -262,13 +262,16 @@ dispatch(KeySym ks, unsigned int state)
 	int pid;
 
 	held_repeat = 0;
-	if (bh_greeter && ks == XK_Escape && bh_panel_up())
-		bh_backspace();
 	if (capturing())
 		return;
 	if (bh_panel_open(live, ks, super_down, mod4)) {
 		cancel_super_menu();
-		if (bh_greeter && greeter_glyph(ks))
+		/*
+		 * The open chord still reaches xlogin. Once the panel
+		 * has moved focus, the glyph does not, and a BackSpace
+		 * would erase a login character.
+		 */
+		if (!bh_panel_up() && bh_greeter && greeter_glyph(ks))
 			bh_backspace();
 		bh_run_panel();
 		return;
@@ -277,7 +280,7 @@ dispatch(KeySym ks, unsigned int state)
 		return;
 	if (p->need_super)
 		cancel_super_menu();
-	if (bh_greeter && p->need_super && greeter_glyph(ks))
+	if (bh_greeter && !bh_panel_up() && p->need_super && greeter_glyph(ks))
 		bh_backspace();
 	/*
 	 * Hardware autorepeat used to queue a child per tick. Those
