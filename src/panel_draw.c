@@ -269,7 +269,7 @@ panel_paint(Display *dpy, Window win, XftDraw *draw, XftFont *font,
 			    (unsigned)caret_h);
 		}
 	}
-	if (bh_greeter) {
+	{
 		int side = ui->search_h;
 		int gap_x = ui->search_x + ui->search_w;
 		int gap_w = ui->win_w - gap_x;
@@ -506,7 +506,7 @@ panel_hit(struct panel_ui *ui, int x, int y, int *row)
 	*row = -2;
 	if (y < 0 || x < 0 || x >= ui->win_w || y >= ui->win_h)
 		return (HIT_OUT);
-	if (bh_greeter && x >= ui->search_x + ui->search_w &&
+	if (x >= ui->search_x + ui->search_w &&
 	    y >= ui->search_y && y < ui->search_y + ui->search_h)
 		return (HIT_CLOSE);
 	if (y >= ui->search_y && y < ui->search_y + ui->search_h &&

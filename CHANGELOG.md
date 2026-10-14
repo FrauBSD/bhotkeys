@@ -1,4 +1,4 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-14 11:06:46 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-14 11:15:50 -0700 Devin Teske $)
 
 # Changelog
 
@@ -18,6 +18,9 @@ repository for 1.0).
   alphabetic instead of alphabetic
 - Add support for remembering scroll position and sort order in
   greeter mode
+- Fix an issue that prevented root window click from dismissing
+  the session panel
+- Make close X present on session panel (as-in greeter panel)
 
 ## 1.3 (2026-10-06)
 

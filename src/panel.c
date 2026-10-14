@@ -17,6 +17,7 @@
 static struct panel_ui ui;
 static struct bh_set set;
 static Window shade = None;
+static long yield_at;
 static int focus_tries;
 static volatile sig_atomic_t nudged;
 static volatile sig_atomic_t quit_req;
@@ -53,16 +54,6 @@ panel_pidfile(int on)
 	fclose(fp);
 }
 
-static void
-step_aside(Display *dpy)
-{
-	if (shade != None)
-		XUnmapWindow(dpy, shade);
-	XUngrabPointer(dpy, CurrentTime);
-	XUngrabKeyboard(dpy, CurrentTime);
-	XFlush(dpy);
-}
-
 static long
 now_ms(void)
 {
@@ -70,6 +61,27 @@ now_ms(void)
 
 	gettimeofday(&tv, NULL);
 	return (tv.tv_sec * 1000L + tv.tv_usec / 1000L);
+}
+
+static void
+cover_root(Display *dpy, Window win)
+{
+	if (bh_greeter || ui.managed || shade == None)
+		return;
+	XMapWindow(dpy, shade);
+	XRaiseWindow(dpy, win);
+}
+
+static void
+step_aside(Display *dpy)
+{
+	ui.yield = 1;
+	yield_at = now_ms();
+	if (shade != None)
+		XUnmapWindow(dpy, shade);
+	XUngrabPointer(dpy, CurrentTime);
+	XUngrabKeyboard(dpy, CurrentTime);
+	XFlush(dpy);
 }
 
 static int
@@ -370,13 +382,21 @@ main(int argc, char **argv)
 
 		if (quit_req || ui.close_req || panel_take_quit(dpy, &ui))
 			break;
+		/*
+		 * A chord lifts the cover so the target can take one
+		 * click. Put it back, or the root click never dismisses.
+		 */
+		if (!bh_greeter && ui.yield && !ui.managed &&
+		    shade != None && now_ms() - yield_at >= 400) {
+			cover_root(dpy, win);
+			ui.yield = 0;
+		}
 		note = panel_pw_note(&ui, now_ms());
 		if (note < 0 || panel_record_dirty())
 			panel_paint(dpy, win, draw, font, small, &fg, &dim,
 			    &accent, &ui);
 		if (nudged) {
 			nudged = 0;
-			ui.yield = 1;
 			step_aside(dpy);
 		}
 		if (XPending(dpy) == 0) {
@@ -496,6 +516,7 @@ main(int argc, char **argv)
 				panel_ui_save(&ui);
 			} else if (ev.xbutton.button == 1) {
 				ui.yield = 0;
+				cover_root(dpy, win);
 				panel_keys_hold(dpy, win, ev.xbutton.time);
 				what = panel_hit(&ui, ev.xbutton.x,
 				    ev.xbutton.y, &row);
@@ -526,12 +547,7 @@ main(int argc, char **argv)
 				break;
 			if (ui.drop_grab) {
 				ui.drop_grab = 0;
-				ui.yield = 1;
-				if (shade != None)
-					XUnmapWindow(dpy, shade);
-				XUngrabPointer(dpy, CurrentTime);
-				XUngrabKeyboard(dpy, CurrentTime);
-				XFlush(dpy);
+				step_aside(dpy);
 			}
 			if (ui.release_keys) {
 				ui.release_keys = 0;

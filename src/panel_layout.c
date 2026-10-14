@@ -83,13 +83,11 @@ metrics(struct panel_ui *ui)
 	ui->search_x = 14;
 	ui->search_y = 16;
 	ui->search_h = ui->font_px + 20;
-	ui->search_w = ui->win_w - 28;
 	/*
 	 * The close mark is a square the height of the field. The field's
 	 * left margin (14) sits on both sides of that square.
 	 */
-	if (bh_greeter)
-		ui->search_w = ui->win_w - ui->search_h - 42;
+	ui->search_w = ui->win_w - ui->search_h - 42;
 	ui->header_h = ui->font_px + 16;
 	ui->foot_listen_x = ui->win_w;
 	ui->foot_listen_x2 = ui->win_w;
