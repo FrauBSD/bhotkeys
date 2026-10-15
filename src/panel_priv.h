@@ -122,6 +122,7 @@ int	panel_pw_note(struct panel_ui *ui, long now);
 const char *panel_row_label(struct panel_ui *ui, int idx);
 void	panel_touch_select(Display *dpy, Window win);
 int	panel_gesture(Display *dpy, XEvent *ev, struct panel_ui *ui);
+int	panel_touch_echo(Time t);
 const char *panel_blurb(const struct bh_plugin *p);
 int	panel_take_quit(Display *dpy, struct panel_ui *ui);
 int	panel_wait(Display *dpy, struct panel_ui *ui, int wait_ms);

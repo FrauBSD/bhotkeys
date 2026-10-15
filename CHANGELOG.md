@@ -1,10 +1,16 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-14 16:26:05 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-15 12:17:26 -0700 Devin Teske $)
 
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed
 in that tag (from the previous tag, or from the start of the
 repository for 1.0).
+
+## 1.5 (2026-10-15)
+
+- Fix inability to close panel with touchscreen tap outside panel
+  region (a tap on the panel list ate subsequent outisde taps
+  until a click [with mouse or trackpad] reset tap)
 
 ## 1.4 (2026-10-13)
 

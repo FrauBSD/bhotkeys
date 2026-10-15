@@ -18,6 +18,24 @@
 static int xi_opcode = -1;
 static int touch_id = -1;
 static int tap_only;
+static Time echo_begin, echo_end;
+
+/*
+ * The emulated ButtonPress and ButtonRelease share the touch time.
+ * Once the gesture has finished they must not be handled again, and
+ * a later real click has a different time.
+ */
+int
+panel_touch_echo(Time t)
+{
+	if (t != 0 &&
+	    ((echo_begin != 0 && t == echo_begin) ||
+	    (echo_end != 0 && t == echo_end)))
+		return (1);
+	echo_begin = 0;
+	echo_end = 0;
+	return (0);
+}
 
 void
 panel_touch_select(Display *dpy, Window win)
@@ -91,6 +109,8 @@ panel_gesture(Display *dpy, XEvent *ev, struct panel_ui *ui)
 	te = cookie->data;
 	if (cookie->evtype == XI_TouchBegin) {
 		touch_id = (int)te->detail;
+		echo_begin = te->time;
+		echo_end = 0;
 		ui->drag_x = (int)te->event_x;
 		ui->drag_y = (int)te->event_y;
 		ui->drag_moved = 0;
@@ -131,6 +151,7 @@ panel_gesture(Display *dpy, XEvent *ev, struct panel_ui *ui)
 		int tap = tap_only;
 		int moved = ui->drag_moved;
 
+		echo_end = te->time;
 		touch_id = -1;
 		tap_only = 0;
 		ui->xtouch = 0;

@@ -485,7 +485,6 @@ main(int argc, char **argv)
 				}
 				if (kind == 3) {
 					ui.drag = 0;
-					ui.xtouch = 2;
 					panel_ui_save(&ui);
 				}
 			}
@@ -511,8 +510,14 @@ main(int argc, char **argv)
 				panel_paint(dpy, win, draw, font, small, &fg,
 				    &dim, &accent, &ui);
 			}
-		} else if ((ev.type == ButtonPress || ev.type == ButtonRelease) &&
-		    ui.xtouch) {
+		} else if ((ev.type == ButtonPress ||
+		    ev.type == ButtonRelease) &&
+		    (ui.xtouch || panel_touch_echo(ev.xbutton.time))) {
+			/*
+			 * While the finger is down, and for the emulated
+			 * press and release that follow it. A press after
+			 * that is a new click.
+			 */
 			if (ev.type == ButtonRelease)
 				ui.xtouch = 0;
 		} else if (ev.type == ButtonRelease &&
