@@ -23,6 +23,10 @@ qt_code(KeySym ks)
 		return ((int)(ks - XK_a + XK_A));
 	if (ks == XK_Print)
 		return (0x01000009);
+	if (ks == XK_Escape)
+		return (0x01000000);
+	if (ks >= XK_F1 && ks <= XK_F35)
+		return (0x01000030 + (int)(ks - XK_F1));
 	if (ks == XK_space)
 		return (0x20);
 	if (ks == XK_slash)

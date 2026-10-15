@@ -9,7 +9,7 @@
 #
 # $Title: Register listener chords with KDE $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-kde-apply 2026-10-04 11:21:26 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-kde-apply 2026-10-15 12:31:13 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -17,16 +17,44 @@
 # see them. Each new chord is a command shortcut that runs true.
 # A sequence KDE already owns is left alone.
 #
+# listen 0 rows name a kglobalaccel component and action in a
+# "# kglobalaccel" comment. The row's chord is added to that
+# action, or taken off when the row is off. Shortcuts on the
+# same action that this row did not set are left in place.
+#
 ############################################################ INCLUDES
 
 . "${0%/*}/bhotkeys-prefix.subr" || exit
 . "$PREFIX/libexec/bhotkeys/bhotkeys-seq.subr" || exit
+. "$PREFIX/libexec/bhotkeys/bhotkeys-plugin.subr" || exit
 
 ############################################################ GLOBALS
 
 pgm="${0##*/}" # Program basename
 
 bh_wm=kde
+bh_tag=kglobalaccel
+
+#
+# Qt::KeyboardModifier values added to a key code
+#
+QT_MOD_SUPER=268435456 # MetaModifier, 0x10000000
+QT_MOD_CTRL=67108864 # ControlModifier, 0x04000000
+QT_MOD_ALT=134217728 # AltModifier, 0x08000000
+QT_MOD_SHIFT=33554432 # ShiftModifier, 0x02000000
+
+#
+# Qt::Key values for the key after the modifiers
+#
+QT_KEY_PERIOD=46 # Key_Period, 0x2e
+QT_KEY_SEMICOLON=59 # Key_Semicolon, 0x3b
+QT_KEY_SLASH=47 # Key_Slash, 0x2f
+QT_KEY_SPACE=32 # Key_Space, 0x20
+QT_KEY_GRAVE=96 # Key_QuoteLeft, 0x60
+QT_KEY_QUESTION=63 # Key_Question, 0x3f
+QT_KEY_PRINT=16777225 # Key_Print, 0x01000009
+QT_KEY_ESCAPE=16777216 # Key_Escape, 0x01000000
+QT_KEY_F1=16777264 # Key_F1, 0x01000030; Fn is this plus n-1
 
 apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 prefix=bhotkeys-swallow-
@@ -77,12 +105,11 @@ write_desktop()
 
 	mkdir -p "$apps"
 	{
-		printf '%s\n' '[Desktop Entry]' 'Type=Application'
-		printf 'Name=bhotkeys: %s\n' "$label"
-		printf '%s\n' 'Exec=/usr/bin/true' 'StartupNotify=false' \
-			'NoDisplay=true' \
-			'X-KDE-GlobalAccel-CommandShortcut=true'
-		printf 'X-KDE-Shortcuts=%s\n' "$seq"
+		printf "%s\n" "[Desktop Entry]" Type=Application
+		printf "Name=bhotkeys: %s\n" "$label"
+		printf "%s\n" Exec=/usr/bin/true StartupNotify=false \
+			NoDisplay=true X-KDE-GlobalAccel-CommandShortcut=true
+		printf "X-KDE-Shortcuts=%s\n" "$seq"
 	} > "$file"
 }
 
@@ -90,6 +117,283 @@ refresh()
 {
 	quietly kbuildsycoca6 --noincremental || : sycoca
 	sleep 1
+}
+
+# Qt key code for a plugin chord. Same bits bh_spell_kde writes.
+qt_of()
+{
+	local rest="$1"
+	local code=0 n u
+
+	while :; do
+		case "$rest" in
+		Super+*)
+			code=$(( $code + $QT_MOD_SUPER ))
+			rest="${rest#Super+}"
+			;;
+		Ctrl+*)
+			code=$(( $code + $QT_MOD_CTRL ))
+			rest="${rest#Ctrl+}"
+			;;
+		Alt+*)
+			code=$(( $code + $QT_MOD_ALT ))
+			rest="${rest#Alt+}"
+			;;
+		Shift+*)
+			code=$(( $code + $QT_MOD_SHIFT ))
+			rest="${rest#Shift+}"
+			;;
+		*) break
+		esac
+	done
+	case "$rest" in
+	period|.) code=$(( $code + $QT_KEY_PERIOD )) ;;
+	semicolon|\;) code=$(( $code + $QT_KEY_SEMICOLON )) ;;
+	slash|/) code=$(( $code + $QT_KEY_SLASH )) ;;
+	space) code=$(( $code + $QT_KEY_SPACE )) ;;
+	grave|\`) code=$(( $code + $QT_KEY_GRAVE )) ;;
+	question|\?) code=$(( $code + $QT_KEY_QUESTION )) ;;
+	Print) code=$(( $code + $QT_KEY_PRINT )) ;;
+	Escape) code=$(( $code + $QT_KEY_ESCAPE )) ;;
+	F1[0-2]|F[1-9])
+		n="${rest#F}"
+		code=$(( $code + $QT_KEY_F1 + $n - 1 ))
+		;;
+	[A-Za-z])
+		u=$( printf %s "$rest" | tr "[:lower:]" "[:upper:]" )
+		code=$(( $code + $( printf %d "'$u" ) ))
+		;;
+	*) return 1
+	esac
+	printf "%s\n" "$code"
+}
+
+load_meta()
+{
+	local out="$1"
+	local dir f line id chord rest comp act
+
+	:> "$out"
+	for dir in "$PREFIX/share/bhotkeys/plugins.d" \
+		${HOME:+$HOME/share/bhotkeys/plugins.d} \
+		${BHOTKEYS_PLUGINS:+$BHOTKEYS_PLUGINS} \
+	; do
+		[ -d "$dir" ] || continue
+		for f in "$dir"/*; do
+			[ -f "$f" ] || continue
+			id= chord= rest=
+			while IFS= read -r line; do
+				case "$line" in
+				'id '*) id="${line#id }" ;;
+				'chord '*) chord="${line#chord }" ;;
+				"# $bh_tag "*)
+					rest="${line#"# $bh_tag "}"
+					;;
+				*) : ok
+				esac
+			done < "$f"
+			[ "$id" ] && [ "$chord" ] && [ "$rest" ] ||
+				continue
+			comp="${rest%% *}"
+			act="${rest#"$comp"}"
+			act="${act# }"
+			[ "$act" ] || continue
+			printf "%s\t%s\t%s\t%s\n" \
+				"$id" "$chord" "$comp" "$act" >> "$out"
+		done
+	done
+}
+
+kga_call()
+{
+	dbus-send --session --print-reply --dest=org.kde.kglobalaccel \
+		/kglobalaccel "$@"
+}
+
+action_of()
+{
+	local comp="$1" act="$2" cache="$3"
+	local line n=0 s1 s2 s3 s4
+
+	if [ ! -s "$cache" ]; then
+		kga_call org.kde.KGlobalAccel.allActionsForComponent \
+			"array:string:$comp" > "$cache" || return 1
+	fi
+	while IFS= read -r line; do
+		case "$line" in
+		*string\ \"*)
+			line="${line#*string \"}"
+			line="${line%\"}"
+			n=$(( $n + 1 ))
+			case "$n" in
+			1) s1="$line" ;;
+			2) s2="$line" ;;
+			3) s3="$line" ;;
+			4)
+				s4="$line"
+				n=0
+				[ "$s2" = "$act" ] || continue
+				printf "%s\t%s\t%s\t%s\n" \
+					"$s1" "$s2" "$s3" "$s4"
+				return 0
+				;;
+			esac
+			;;
+		*) : ok
+		esac
+	done < "$cache"
+	return 1
+}
+
+keys_of()
+{
+	local reply out
+
+	reply=$( kga_call org.kde.KGlobalAccel.shortcut \
+		"array:string:$1,$2,$3,$4" ) || return 1
+	out=$( printf "%s\n" "$reply" | awk '/int32 / { print $2 }' |
+		tr '\n' ' ' )
+	printf %s "${out% }"
+}
+
+keys_set()
+{
+	local a1="$1" a2="$2" a3="$3" a4="$4" joined="$5"
+
+	kga_call org.kde.KGlobalAccel.setShortcut \
+		"array:string:$a1,$a2,$a3,$a4" \
+		"array:int32:$joined" uint32:4 > /dev/null
+}
+
+list_has()
+{
+	local want="$1"
+	local x
+
+	shift
+	for x in "$@"; do
+		[ "$x" = "$want" ] && return 0
+	done
+	return 1
+}
+
+list_del()
+{
+	local drop="$1"
+	local x out=
+
+	shift
+	for x in "$@"; do
+		[ "$x" = "$drop" ] && continue
+		out="$out $x"
+	done
+	printf %s "${out# }"
+}
+
+canon()
+{
+	[ "$#" -gt 0 ] || return 0
+	printf "%s\n" "$@" | sort -n | tr '\n' ' '
+}
+
+drop_key()
+{
+	local __var_to_set="$1" drop="$2" keep="$3"
+	local cur out
+
+	eval cur=\"\$$__var_to_set\"
+	[ "$drop" ] || return 0
+	[ "$keep" ] && [ "$drop" = "$keep" ] && return 0
+	out=$( list_del "$drop" $cur )
+	eval $__var_to_set=\"\$out\"
+}
+
+sync_owned()
+{
+	local meta rows cache dir state fresh
+	local id en code chord comp act stock old
+	local a1 a2 a3 a4 cur next joined was now keep
+	local sid scode x comma
+
+	have dbus-send || return 0
+	meta=$( mktemp )
+	rows=$( mktemp )
+	fresh=$( mktemp )
+	cache=$( mktemp -d )
+	trap 'rm -f "$want" "$rawk" "$fresh";
+		rm -rf "$meta" "$rows" "$cache"' EXIT
+	load_meta "$meta"
+	awk -F '\t' '
+		NR == FNR { row[$1] = $0; next }
+		END {
+			for (i in row)
+				print row[i]
+		}
+	' "$meta" "$meta" > "$rows"
+	mv -f "$rows" "$meta"
+	awk -F '\t' '
+		NR == FNR {
+			meta[$1] = $2 "\t" $3 "\t" $4
+			next
+		}
+		$2 == 0 && ($1 in meta) {
+			print $1 "\t" $3 "\t" $5 "\t" meta[$1]
+		}
+	' "$meta" "$rawk" > "$rows"
+	state_path state
+	while IFS='	' read -r id en code chord comp act; do
+		[ "$id" ] || continue
+		case "$code" in
+		*[!0-9]*) continue ;;
+		esac
+		stock=$( qt_of "$chord" ) || stock=
+		action_of "$comp" "$act" "$cache/$comp" > "$cache/one" ||
+			continue
+		IFS='	' read -r a1 a2 a3 a4 < "$cache/one" || continue
+		[ "$a1" ] || continue
+		cur=$( keys_of "$a1" "$a2" "$a3" "$a4" ) || continue
+		old=
+		if [ "$state" ] && [ -f "$state" ]; then
+			while IFS='	' read -r sid scode; do
+				[ "$sid" = "$id" ] || continue
+				old="$scode"
+				break
+			done < "$state"
+		fi
+		next="$cur"
+		if [ "$en" = 1 ]; then
+			keep="$code"
+		else
+			keep=
+		fi
+		drop_key next "$stock" "$keep"
+		drop_key next "$old" "$keep"
+		if [ "$en" != 1 ]; then
+			drop_key next "$code" ""
+		elif ! list_has "$code" $next; then
+			next="${next# } $code"
+			next="${next# }"
+		fi
+		was=$( canon $cur )
+		now=$( canon $next )
+		if [ "$was" != "$now" ]; then
+			joined=
+			comma=
+			for x in $next; do
+				joined="$joined$comma$x"
+				comma=,
+			done
+			keys_set "$a1" "$a2" "$a3" "$a4" "$joined" ||
+				continue
+		fi
+		if [ "$en" = 1 ]; then
+			printf "%s\t%s\n" "$id" "$code" >> "$fresh"
+		fi
+	done < "$rows"
+	if [ "$state" ]; then
+		mkdir -p "${state%/*}"
+		mv -f "$fresh" "$state"
+	fi
 }
 
 ############################################################ MAIN
@@ -150,6 +454,8 @@ while IFS='	' read -r id seq code label; do
 done < "$want"
 
 [ "$changed" ] && refresh
+
+sync_owned
 
 ################################################################################
 # END
