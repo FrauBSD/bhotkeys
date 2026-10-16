@@ -60,7 +60,7 @@ void
 panel_ui_load(struct panel_ui *ui)
 {
 	FILE *fp;
-	char path[512], line[64];
+	char path[512], line[128];
 	int v;
 
 	/*
@@ -88,6 +88,25 @@ panel_ui_load(struct panel_ui *ui)
 			ui->scroll = v;
 			ui->saved_scroll = v;
 		}
+		else if (strncmp(line, "search", 6) == 0 &&
+		    (line[6] == ' ' || line[6] == '\n' || line[6] == '\0')) {
+			char *s = line + 6;
+			char *nl;
+
+			if (*s == ' ')
+				s++;
+			nl = strpbrk(s, "\r\n");
+			if (nl != NULL)
+				*nl = '\0';
+			strlcpy(ui->query, s, sizeof(ui->query));
+			ui->qpos = (int)strlen(ui->query);
+			/*
+			 * The filtered list opens at the top. saved_scroll
+			 * stays the position from before the search.
+			 */
+			if (ui->query[0] != '\0')
+				ui->scroll = 0;
+		}
 	}
 	fclose(fp);
 }
@@ -111,6 +130,8 @@ panel_ui_save(const struct panel_ui *ui)
 		return;
 	fprintf(fp, "sort %d\nrev %d\nscroll %d\n",
 	    ui->sort_col, ui->sort_rev ? 1 : 0, ui->saved_scroll);
+	if (ui->query[0] != '\0' && strpbrk(ui->query, "\r\n") == NULL)
+		fprintf(fp, "search %s\n", ui->query);
 	fclose(fp);
 }
 
