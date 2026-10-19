@@ -186,6 +186,8 @@ lines.
 When none appears in that time, exit 1.
 .Fl Fl wm
 prints that name without waiting.
+.It Fl Fl version
+Print the version and exit.
 .It Fl Fl wm Ar name
 Treat
 .Ar name
@@ -203,8 +205,6 @@ first cannot start.
 An unknown
 .Ar name
 is an error.
-.It Fl Fl version
-Print the version and exit.
 .El
 .Pp
 An unrecognized option, or no options, prints the usage and exits non-zero.
