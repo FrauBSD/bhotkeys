@@ -2,7 +2,7 @@
 .\"
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
-.Dd October 6, 2026
+.Dd October 19, 2026
 .Dt BHOTKEYS 1
 .Os
 .Sh NAME
@@ -22,6 +22,8 @@
 .Nm
 .Fl Fl print-wm
 .Op Fl Fl wm Ar name
+.Nm
+.Fl Fl version
 .Sh DESCRIPTION
 .Nm
 watches key presses through the X Record extension and runs the
@@ -201,6 +203,8 @@ first cannot start.
 An unknown
 .Ar name
 is an error.
+.It Fl Fl version
+Print the version and exit.
 .El
 .Pp
 An unrecognized option, or no options, prints the usage and exits non-zero.

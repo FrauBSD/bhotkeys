@@ -15,6 +15,7 @@
 #define BH_GROUP_MAX	48
 #define BH_CHORD_SLOTS	256	/* hash width; the chain is not a cap */
 #define BH_WM_WAIT	30	/* seconds the daemon waits for a manager */
+#define BH_VERSION	"1.5.2"
 #ifndef PREFIX
 #define PREFIX		"/usr/local"
 #endif

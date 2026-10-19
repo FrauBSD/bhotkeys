@@ -7,9 +7,10 @@
 /*
  * Dispatch bhotkeys. --panel replaces this process with the chord
  * list. --print-keys format prints the chord list spelled for that
- * window manager and exits. Otherwise the process loads plugins and
- * listens. --greeter selects the login greeter. --wm name stands in
- * for the detected window manager.
+ * window manager and exits. --version prints the version and exits.
+ * Otherwise the process loads plugins and listens. --greeter selects
+ * the login greeter. --wm name stands in for the detected window
+ * manager.
  */
 
 #include <stdio.h>
@@ -25,7 +26,8 @@ usage(void)
 	    "Usage: bhotkeys --daemon [--greeter] [--wm name]\n"
 	    "       bhotkeys --panel [--greeter]\n"
 	    "       bhotkeys --print-keys format [--wm name]\n"
-	    "       bhotkeys --print-wm [--wm name]\n");
+	    "       bhotkeys --print-wm [--wm name]\n"
+	    "       bhotkeys --version\n");
 	bh_print_formats(stderr);
 }
 
@@ -44,6 +46,10 @@ main(int argc, char **argv)
 	memset(&set, 0, sizeof(set));
 
 	for (i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--version") == 0) {
+			printf("%s\n", BH_VERSION);
+			return (0);
+		}
 		if (strcmp(argv[i], "-d") == 0 ||
 		    strcmp(argv[i], "--daemon") == 0) {
 			daemon = 1;
