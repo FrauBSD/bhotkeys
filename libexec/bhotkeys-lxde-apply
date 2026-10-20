@@ -9,7 +9,7 @@
 #
 # $Title: Grab listener chords in LXDE $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-lxde-apply 2026-10-04 11:21:26 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-lxde-apply 2026-10-20 15:28:20 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -56,23 +56,17 @@ seed_rc()
 		/etc/xdg/openbox/rc.xml
 }
 
+############################################################ MAIN
 
-main()
-{
-	case "$1" in
-	--wait) apply_wait lxde_up || exit 0 ;;
-	*) lxde_up || exit 0
-	esac
-	[ "$HOME" ] || exit 0
-	bh_resolve || exit 0
-	rc_path
-	seed_rc || exit 0
-	ob_apply
-}
-
-case "$0" in
-*bhotkeys-lxde-apply) main "$@" ;;
+case "$1" in
+--wait) apply_wait lxde_up || exit 0 ;;
+*) lxde_up || exit 0
 esac
+[ "$HOME" ] || exit 0
+bh_resolve || exit 0
+rc_path
+seed_rc || exit 0
+ob_apply
 
 ################################################################################
 # END

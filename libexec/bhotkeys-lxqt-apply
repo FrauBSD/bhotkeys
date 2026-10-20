@@ -9,7 +9,7 @@
 #
 # $Title: Grab listener chords in LXQt $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-lxqt-apply 2026-10-04 11:21:26 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-lxqt-apply 2026-10-20 15:28:20 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -154,43 +154,35 @@ start_keysd()
 	/usr/sbin/daemon -f lxqt-globalkeysd || : start failed
 }
 
-main()
-{
-	local __chords __want __new __seen __was
+############################################################ MAIN
 
-	case "$1" in
-	--wait) apply_wait lxqt_up || exit 0 ;;
-	*) lxqt_up || exit 0
-	esac
-	[ "$HOME" ] || exit 0
-	bh_resolve || exit 0
-	conf_path
-	seed_conf || exit 0
-	[ -f "$conf_file" ] || exit 0
-	__chords=$( mktemp ) || exit 0
-	__want=$( mktemp ) || exit 0
-	__new=$( mktemp ) || exit 0
-	__seen=$( mktemp ) || exit 0
-	seen="$__seen"
-	trap 'rm -f "$__chords" "$__want" "$__new" "$__seen"' EXIT
-	chord_file "$__chords" || exit 0
-	build_want "$__chords" > "$__want"
-	merge_conf "$conf_file" "$__want" > "$__new" || exit 0
-	if cmp -s "$conf_file" "$__new"; then
-		exit 0
-	fi
-	__was=$( keysd_pid )
-	[ "$__was" ] && stop_keysd
-	if ! cat "$__new" > "$conf_file"; then
-		[ "$__was" ] && start_keysd
-		exit 0
-	fi
-	[ "$__was" ] && start_keysd
-}
-
-case "$0" in
-*bhotkeys-lxqt-apply) main "$@" ;;
+case "$1" in
+--wait) apply_wait lxqt_up || exit 0 ;;
+*) lxqt_up || exit 0
 esac
+[ "$HOME" ] || exit 0
+bh_resolve || exit 0
+conf_path
+seed_conf || exit 0
+[ -f "$conf_file" ] || exit 0
+chords=$( mktemp ) || exit 0
+want=$( mktemp ) || exit 0
+new=$( mktemp ) || exit 0
+seen=$( mktemp ) || exit 0
+trap 'rm -f "$chords" "$want" "$new" "$seen"' EXIT
+chord_file "$chords" || exit 0
+build_want "$chords" > "$want"
+merge_conf "$conf_file" "$want" > "$new" || exit 0
+if cmp -s "$conf_file" "$new"; then
+	exit 0
+fi
+was=$( keysd_pid )
+[ "$was" ] && stop_keysd
+if ! cat "$new" > "$conf_file"; then
+	[ "$was" ] && start_keysd
+	exit 0
+fi
+[ "$was" ] && start_keysd
 
 ################################################################################
 # END

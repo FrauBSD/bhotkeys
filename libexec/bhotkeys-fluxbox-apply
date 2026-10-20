@@ -9,7 +9,7 @@
 #
 # $Title: Grab listener chords in fluxbox $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-fluxbox-apply 2026-10-04 11:21:26 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-fluxbox-apply 2026-10-20 15:28:20 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -121,35 +121,27 @@ reload_fluxbox()
 	quietly fluxbox-remote reconfigure || : remote failed
 }
 
-main()
-{
-	local __chords __taken __body __seen
+############################################################ MAIN
 
-	case "$1" in
-	--wait) apply_wait fluxbox_up || exit 0 ;;
-	*) fluxbox_up || exit 0
-	esac
-	[ "$HOME" ] || exit 0
-	bh_resolve || exit 0
-	keys_path
-	seed_keys || exit 0
-	[ -f "$keys_file" ] || exit 0
-	__chords=$( mktemp ) || exit 0
-	__taken=$( mktemp ) || exit 0
-	__body=$( mktemp ) || exit 0
-	__seen=$( mktemp ) || exit 0
-	seen="$__seen"
-	trap 'rm -f "$__chords" "$__taken" "$__body" "$__seen"' EXIT
-	chord_file "$__chords" || exit 0
-	flux_taken "$keys_file" > "$__taken"
-	emit_block "$__chords" "$__taken" > "$__body"
-	replace_region "$keys_file" "$begin" "$end" "$__body" || exit 0
-	[ "$region_changed" ] && reload_fluxbox
-}
-
-case "$0" in
-*bhotkeys-fluxbox-apply) main "$@" ;;
+case "$1" in
+--wait) apply_wait fluxbox_up || exit 0 ;;
+*) fluxbox_up || exit 0
 esac
+[ "$HOME" ] || exit 0
+bh_resolve || exit 0
+keys_path
+seed_keys || exit 0
+[ -f "$keys_file" ] || exit 0
+chords=$( mktemp ) || exit 0
+taken=$( mktemp ) || exit 0
+body=$( mktemp ) || exit 0
+seen=$( mktemp ) || exit 0
+trap 'rm -f "$chords" "$taken" "$body" "$seen"' EXIT
+chord_file "$chords" || exit 0
+flux_taken "$keys_file" > "$taken"
+emit_block "$chords" "$taken" > "$body"
+replace_region "$keys_file" "$begin" "$end" "$body" || exit 0
+[ "$region_changed" ] && reload_fluxbox
 
 ################################################################################
 # END

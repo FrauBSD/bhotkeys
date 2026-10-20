@@ -9,7 +9,7 @@
 #
 # $Title: Grab listener chords in Cinnamon $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-cinnamon-apply 2026-10-04 11:21:26 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-cinnamon-apply 2026-10-20 15:28:20 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -124,64 +124,54 @@ reset_id()
 	quietly gsettings reset "$__path" binding || : reset
 }
 
-main()
-{
-	local __chords __listed __user __keep __old __accs __cur
-	local __id __acc __path __val
+############################################################ MAIN
 
-	case "$1" in
-	--wait) apply_wait cinnamon_up || exit 0 ;;
-	*) cinnamon_up || exit 0
-	esac
-	bus_ok
-	bh_resolve || exit 0
-	__cur=$( gsettings get "$parent" custom-list ) || exit 0
-	__chords=$( mktemp ) || exit 0
-	__listed=$( mktemp ) || exit 0
-	__user=$( mktemp ) || exit 0
-	__keep=$( mktemp ) || exit 0
-	__old=$( mktemp ) || exit 0
-	__accs=$( mktemp ) || exit 0
-	listed="$__listed"
-	keep_acc="$__accs"
-	trap 'rm -f "$__chords" "$__listed" "$__user" "$__keep" "$__old" \
-		"$__accs" "$__user.ids"' EXIT
-	chord_file "$__chords" || exit 0
-	gsettings list-recursively "$parent" > "$__listed" || exit 0
-	printf '%s\n' "$__cur" | list_ids > "$__user.ids"
-	while read -r __id; do
-		case "$__id" in
-		bhotkeys-*) printf '%s\n' "$__id" >> "$__old" ;;
-		*) printf '%s\n' "$__id" >> "$__user"
-		esac
-	done < "$__user.ids"
-	rm -f "$__user.ids"
-	while IFS='	' read -r __id __acc; do
-		[ "$__id" ] || continue
-		owned_acc "$__acc" "$__id" && continue
-		grep -qFx "$__acc" "$keep_acc" &&
-			continue
-		__path="$custom:${base}bhotkeys-$__id/"
-		gs_set "$__path" name "bhotkeys" || continue
-		gs_set "$__path" command "$mark" || continue
-		gs_set "$__path" binding "['$__acc']" || continue
-		printf '%s\n' "bhotkeys-$__id" >> "$__keep"
-		printf '%s\n' "$__acc" >> "$keep_acc"
-	done < "$__chords"
-	__val=$( cat "$__user" "$__keep" | awk '
-		$0 ~ /^[A-Za-z0-9_-]+$/ && !seen[$0]++ { print }
-	' | list_value )
-	gs_set "$parent" custom-list "$__val" || exit 0
-	while read -r __id; do
-		[ "$__id" ] || continue
-		grep -qFx "$__id" "$__keep" && continue
-		reset_id "$__id"
-	done < "$__old"
-}
-
-case "$0" in
-*bhotkeys-cinnamon-apply) main "$@" ;;
+case "$1" in
+--wait) apply_wait cinnamon_up || exit 0 ;;
+*) cinnamon_up || exit 0
 esac
+bus_ok
+bh_resolve || exit 0
+cur=$( gsettings get "$parent" custom-list ) || exit 0
+chords=$( mktemp ) || exit 0
+listed=$( mktemp ) || exit 0
+user=$( mktemp ) || exit 0
+keep=$( mktemp ) || exit 0
+old=$( mktemp ) || exit 0
+keep_acc=$( mktemp ) || exit 0
+trap 'rm -f "$chords" "$listed" "$user" "$keep" "$old" \
+	"$keep_acc" "$user.ids"' EXIT
+chord_file "$chords" || exit 0
+gsettings list-recursively "$parent" > "$listed" || exit 0
+printf '%s\n' "$cur" | list_ids > "$user.ids"
+while read -r id; do
+	case "$id" in
+	bhotkeys-*) printf '%s\n' "$id" >> "$old" ;;
+	*) printf '%s\n' "$id" >> "$user"
+	esac
+done < "$user.ids"
+rm -f "$user.ids"
+while IFS='	' read -r id acc; do
+	[ "$id" ] || continue
+	owned_acc "$acc" "$id" && continue
+	grep -qFx "$acc" "$keep_acc" &&
+		continue
+	path="$custom:${base}bhotkeys-$id/"
+	gs_set "$path" name "bhotkeys" || continue
+	gs_set "$path" command "$mark" || continue
+	gs_set "$path" binding "['$acc']" || continue
+	printf '%s\n' "bhotkeys-$id" >> "$keep"
+	printf '%s\n' "$acc" >> "$keep_acc"
+done < "$chords"
+val=$( cat "$user" "$keep" | awk '
+	$0 ~ /^[A-Za-z0-9_-]+$/ && !seen[$0]++ { print }
+' | list_value )
+gs_set "$parent" custom-list "$val" || exit 0
+while read -r id; do
+	[ "$id" ] || continue
+	grep -qFx "$id" "$keep" && continue
+	reset_id "$id"
+done < "$old"
 
 ################################################################################
 # END

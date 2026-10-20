@@ -9,7 +9,7 @@
 #
 # $Title: Plant xmonad keys and reload $
 # $Copyright: 2026 Devin Teske. All rights reserved. $
-# $FrauBSD: bhotkeys/libexec/bhotkeys-xmonad-apply 2026-10-04 11:21:26 -0700 Devin Teske $
+# $FrauBSD: bhotkeys/libexec/bhotkeys-xmonad-apply 2026-10-20 15:28:20 -0700 Devin Teske $
 #
 ############################################################ INFORMATION
 #
@@ -103,71 +103,63 @@ hook_main()
 	rm -f "$__tmp"
 }
 
-main()
-{
-	local __chords __body __seen __hs __mod __hsbak __modbak __changed
+############################################################ MAIN
 
-	case "$1" in
-	--wait) apply_wait xmonad_up || exit 0 ;;
-	*) xmonad_up || exit 0
-	esac
-	[ "$HOME" ] || exit 0
-	bh_resolve || exit 0
-	have xmonad || exit 0
-	__mod="$HOME/.xmonad/lib/BhotkeysSwallow.hs"
-	__hs="$HOME/.xmonad/xmonad.hs"
-	__chords=$( mktemp ) || exit 0
-	__body=$( mktemp ) || exit 0
-	__seen=$( mktemp ) || exit 0
-	seen="$__seen"
-	trap 'rm -f "$__chords" "$__body" "$__seen"' EXIT
-	chord_file "$__chords" || exit 0
-	emit_module "$__chords" > "$__body"
-	mkdir -p "${__mod%/*}" || exit 0
-	__changed=
-	if [ ! -f "$__mod" ] || ! cmp -s "$__mod" "$__body"; then
-		__changed=1
-	fi
-	if [ -f "$__hs" ]; then
-		if ! grep -qF 'bhotkeysKeys' "$__hs"; then
-			if grep -qx 'main = xmonad def' "$__hs" ||
-			   grep -qx 'main = xmonad defaultConfig' "$__hs"
-			then
-				__changed=1
-			fi
-		fi
-	fi
-	[ "$__changed" ] || exit 0
-	__modbak=$( mktemp ) || exit 0
-	__hsbak=$( mktemp ) || exit 0
-	trap 'rm -f "$__chords" "$__body" "$__seen" "$__modbak" "$__hsbak"' \
-		EXIT
-	if [ -f "$__mod" ]; then
-		cp "$__mod" "$__modbak" || exit 0
-	fi
-	if [ -f "$__hs" ]; then
-		cp "$__hs" "$__hsbak" || exit 0
-	fi
-	cat "$__body" > "$__mod" || exit 0
-	if [ -f "$__hs" ]; then
-		hook_main "$__hs" || {
-			[ -s "$__modbak" ] && cat "$__modbak" > "$__mod"
-			exit 0
-		}
-	fi
-	if [ -f "$__hs" ]; then
-		if ! quietly xmonad --recompile; then
-			[ -s "$__modbak" ] && cat "$__modbak" > "$__mod"
-			[ -s "$__hsbak" ] && cat "$__hsbak" > "$__hs"
-			exit 0
-		fi
-		quietly xmonad --restart || : restart failed
-	fi
-}
-
-case "$0" in
-*bhotkeys-xmonad-apply) main "$@" ;;
+case "$1" in
+--wait) apply_wait xmonad_up || exit 0 ;;
+*) xmonad_up || exit 0
 esac
+[ "$HOME" ] || exit 0
+bh_resolve || exit 0
+have xmonad || exit 0
+mod="$HOME/.xmonad/lib/BhotkeysSwallow.hs"
+hs="$HOME/.xmonad/xmonad.hs"
+chords=$( mktemp ) || exit 0
+body=$( mktemp ) || exit 0
+seen=$( mktemp ) || exit 0
+trap 'rm -f "$chords" "$body" "$seen"' EXIT
+chord_file "$chords" || exit 0
+emit_module "$chords" > "$body"
+mkdir -p "${mod%/*}" || exit 0
+changed=
+if [ ! -f "$mod" ] || ! cmp -s "$mod" "$body"; then
+	changed=1
+fi
+if [ -f "$hs" ]; then
+	if ! grep -qF 'bhotkeysKeys' "$hs"; then
+		if grep -qx 'main = xmonad def' "$hs" ||
+		   grep -qx 'main = xmonad defaultConfig' "$hs"
+		then
+			changed=1
+		fi
+	fi
+fi
+[ "$changed" ] || exit 0
+modbak=$( mktemp ) || exit 0
+hsbak=$( mktemp ) || exit 0
+trap 'rm -f "$chords" "$body" "$seen" "$modbak" "$hsbak"' \
+	EXIT
+if [ -f "$mod" ]; then
+	cp "$mod" "$modbak" || exit 0
+fi
+if [ -f "$hs" ]; then
+	cp "$hs" "$hsbak" || exit 0
+fi
+cat "$body" > "$mod" || exit 0
+if [ -f "$hs" ]; then
+	hook_main "$hs" || {
+		[ -s "$modbak" ] && cat "$modbak" > "$mod"
+		exit 0
+	}
+fi
+if [ -f "$hs" ]; then
+	if ! quietly xmonad --recompile; then
+		[ -s "$modbak" ] && cat "$modbak" > "$mod"
+		[ -s "$hsbak" ] && cat "$hsbak" > "$hs"
+		exit 0
+	fi
+	quietly xmonad --restart || : restart failed
+fi
 
 ################################################################################
 # END
