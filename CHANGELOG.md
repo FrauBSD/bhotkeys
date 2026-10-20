@@ -1,4 +1,4 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-20 15:00:24 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-20 15:00:34 -0700 Devin Teske $)
 
 # Changelog
 
@@ -9,6 +9,7 @@ repository for 1.0).
 ## 1.6 (2026-10-20)
 
 - Remember scroll position of a saved search
+- bhotkeys-dwm-apply disables and remaps built-in dwm chords
 
 ## 1.5.2 (2026-10-19)
 
