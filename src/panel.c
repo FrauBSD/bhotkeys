@@ -205,7 +205,6 @@ sort_flip(struct panel_ui *u, int col)
 		u->sort_rev = 0;
 	}
 	u->scroll = 0;
-	u->saved_scroll = 0;
 	panel_refilter(u);
 	panel_ui_save(u);
 }

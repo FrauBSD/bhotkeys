@@ -187,8 +187,6 @@ panel_scroll_set(struct panel_ui *ui, int y)
 	if (y > max)
 		y = max;
 	ui->scroll = y;
-	if (ui->query[0] == '\0')
-		ui->saved_scroll = y;
 }
 
 void
@@ -220,8 +218,6 @@ panel_scroll(struct panel_ui *ui, int dir, int page)
 		ui->scroll = 0;
 	if (ui->scroll > max)
 		ui->scroll = max;
-	if (ui->query[0] == '\0')
-		ui->saved_scroll = ui->scroll;
 }
 
 void

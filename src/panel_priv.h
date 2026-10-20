@@ -38,8 +38,7 @@ struct panel_ui {
 	int	readonly;
 	int	capture;	/* -2 idle, -1 panel chord, >=0 plugin */
 	int	managed;
-	int	scroll;		/* pixels into the list */
-	int	saved_scroll;	/* position to restore; search does not clobber it */
+	int	scroll;		/* pixels into this list, filter included */
 	int	sort_col;	/* -1 none, 0 name, 1 chord */
 	int	sort_rev;
 	int	font_px;
