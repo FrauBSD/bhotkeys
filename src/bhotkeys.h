@@ -63,6 +63,8 @@ struct bh_set {
 	KeySym	panel_alt_ks;
 	int	panel_super;
 	int	panel_alt_super;
+	int	panel_shift;
+	int	panel_alt_shift;
 	int	panel_on;	/* 0: Super+? does not open the list */
 	int	panel_alt_on;	/* 0: Super+/ does not open the list */
 	int	listener_on;	/* 0: panel chords only; checks stay saved */
@@ -108,9 +110,9 @@ int	bh_match(const struct bh_set *set, KeySym ks, int super,
  */
 extern volatile sig_atomic_t bh_greeter_listen;
 int	bh_panel_chord(const struct bh_set *set, KeySym ks, int super,
-	    int mod4);
+	    int mod4, int shift);
 int	bh_panel_open(const struct bh_set *set, KeySym ks, int super,
-	    int mod4);
+	    int mod4, int shift);
 void	bh_print_fvwm_keys(const struct bh_set *set);
 int	bh_print_keys(const struct bh_set *set, const char *format);
 void	bh_print_formats(FILE *fp);

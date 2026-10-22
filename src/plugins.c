@@ -317,7 +317,7 @@ bh_load(struct bh_set *set)
 	const char *home = getenv("HOME");
 	char path[512];
 
-	int junk_alt, junk_shift, junk_ctrl;
+	int junk_alt, junk_ctrl;
 
 	bh_set_clear(set);
 	set->panel_on = 1;
@@ -336,18 +336,21 @@ bh_load(struct bh_set *set)
 		scan_dir(set, extra);
 	bh_apply_overrides(set);
 	if (bh_chord_parse(set->panel_chord, &set->panel_ks,
-	    &set->panel_super, &junk_alt, &junk_shift, &junk_ctrl) != 0) {
+	    &set->panel_super, &junk_alt, &set->panel_shift, &junk_ctrl) != 0) {
 		strlcpy(set->panel_chord, BH_PANEL_CHORD,
 		    sizeof(set->panel_chord));
 		set->panel_ks = XK_question;
 		set->panel_super = 1;
+		set->panel_shift = 0;
 	}
 	if (bh_chord_parse(set->panel_alt_chord, &set->panel_alt_ks,
-	    &set->panel_alt_super, &junk_alt, &junk_shift, &junk_ctrl) != 0) {
+	    &set->panel_alt_super, &junk_alt, &set->panel_alt_shift,
+	    &junk_ctrl) != 0) {
 		strlcpy(set->panel_alt_chord, BH_PANEL_ALT_CHORD,
 		    sizeof(set->panel_alt_chord));
 		set->panel_alt_ks = XK_slash;
 		set->panel_alt_super = 1;
+		set->panel_alt_shift = 0;
 	}
 	bh_rebind(set);
 	return (0);

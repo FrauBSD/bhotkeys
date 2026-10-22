@@ -1,10 +1,15 @@
-[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-20 15:28:20 -0700 Devin Teske $)
+[//]: # ($FrauBSD: bhotkeys/CHANGELOG.md 2026-10-22 11:08:25 -0700 Devin Teske $)
 
 # Changelog
 
 Newest first. Each section is a git tag; the bullets are what landed
 in that tag (from the previous tag, or from the start of the
 repository for 1.0).
+
+## 1.7 (2026-10-22)
+
+- Fix Set Keys storing Shift+A as A, and the listener running
+  that action for both A and Shift+A
 
 ## 1.6 (2026-10-20)
 

@@ -226,7 +226,6 @@ note_chord(KeySym ks, unsigned int state, char *dst, size_t len)
 	int alt = (state & Mod1Mask) != 0;
 	int shift = (state & ShiftMask) != 0;
 	int ctrl = (state & ControlMask) != 0;
-	int letter = 0;
 
 	dst[0] = '\0';
 	if (ks >= XK_A && ks <= XK_Z)
@@ -246,7 +245,6 @@ note_chord(KeySym ks, unsigned int state, char *dst, size_t len)
 	else if (ks >= XK_a && ks <= XK_z) {
 		key[0] = (char)toupper((unsigned char)ks);
 		key[1] = '\0';
-		letter = 1;
 	} else {
 		const char *name = XKeysymToString(ks);
 
@@ -261,7 +259,7 @@ note_chord(KeySym ks, unsigned int state, char *dst, size_t len)
 		strlcat(tmp, "Ctrl+", sizeof(tmp));
 	if (alt)
 		strlcat(tmp, "Alt+", sizeof(tmp));
-	if (shift && !letter)
+	if (shift)
 		strlcat(tmp, "Shift+", sizeof(tmp));
 	strlcat(tmp, key, sizeof(tmp));
 	if (strlen(tmp) >= len)

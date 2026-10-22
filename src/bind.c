@@ -137,7 +137,8 @@ same_key(KeySym a, KeySym b)
 }
 
 int
-bh_panel_chord(const struct bh_set *set, KeySym ks, int super, int mod4)
+bh_panel_chord(const struct bh_set *set, KeySym ks, int super, int mod4,
+    int shift)
 {
 	int sup = super || mod4;
 
@@ -145,17 +146,22 @@ bh_panel_chord(const struct bh_set *set, KeySym ks, int super, int mod4)
 		return (0);
 	if (set->panel_super && !sup)
 		return (0);
+	if (set->panel_shift != shift)
+		return (0);
 	return (same_key(ks, set->panel_ks));
 }
 
 int
-bh_panel_open(const struct bh_set *set, KeySym ks, int super, int mod4)
+bh_panel_open(const struct bh_set *set, KeySym ks, int super, int mod4,
+    int shift)
 {
-	if (set->panel_on && bh_panel_chord(set, ks, super, mod4))
+	if (set->panel_on && bh_panel_chord(set, ks, super, mod4, shift))
 		return (1);
 	if (!set->panel_alt_on || set->panel_alt_ks == NoSymbol)
 		return (0);
 	if (set->panel_alt_super && !(super || mod4))
+		return (0);
+	if (set->panel_alt_shift != shift)
 		return (0);
 	return (same_key(ks, set->panel_alt_ks));
 }
@@ -190,10 +196,7 @@ bh_match(const struct bh_set *set, KeySym ks, int super, unsigned int state,
 			continue;
 		if (p->need_ctrl != ctrl)
 			continue;
-		if (p->need_shift && !shift)
-			continue;
-		if (!p->need_shift && shift &&
-		    !((ks >= XK_a && ks <= XK_z) || (ks >= XK_A && ks <= XK_Z)))
+		if (p->need_shift != shift)
 			continue;
 		if (!same_key(ks, p->ks))
 			continue;

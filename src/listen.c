@@ -40,6 +40,7 @@ static int lock_fd = -1;
 static int super_down;
 static KeySym held_ks = NoSymbol;
 static KeyCode held_code = 0;
+static unsigned int held_state;
 static int held_repeat;
 static struct timeval held_since, last_fire;
 static struct bh_set *live;
@@ -259,12 +260,13 @@ dispatch(KeySym ks, unsigned int state)
 {
 	const struct bh_plugin *p;
 	int mod4 = (state & Mod4Mask) != 0;
+	int shift = (state & ShiftMask) != 0;
 	int pid;
 
 	held_repeat = 0;
 	if (capturing())
 		return;
-	if (bh_panel_open(live, ks, super_down, mod4)) {
+	if (bh_panel_open(live, ks, super_down, mod4, shift)) {
 		cancel_super_menu();
 		/*
 		 * The open chord still reaches xlogin. Once the panel
@@ -316,6 +318,7 @@ commit_up(void)
 		held_ks = NoSymbol;
 		held_code = 0;
 		held_repeat = 0;
+		held_state = 0;
 	}
 }
 
@@ -349,22 +352,26 @@ on_key(int type, KeyCode code, unsigned int state, Time when)
 	track_alt(ks, 1);
 	if (alt_down && (state & Mod1Mask) == 0)
 		state |= Mod1Mask;
-	/* Level 0 of this key is slash; Shift selects question */
+	/* Shift selects question on slash; it is not a chord modifier */
 	if ((state & ShiftMask) != 0 && ks == XK_slash) {
 		KeySym up = XkbKeycodeToKeysym(bh_dpy, code, 0, 1);
 
-		if (up != NoSymbol)
+		if (up != NoSymbol) {
 			ks = up;
+			state &= ~ShiftMask;
+		}
 	}
 	dispatch(ks, state);
 	gettimeofday(&last_fire, NULL);
 	if (held_repeat) {
 		held_ks = ks;
 		held_code = code;
+		held_state = state;
 		held_since = last_fire;
 	} else {
 		held_ks = NoSymbol;
 		held_code = 0;
+		held_state = 0;
 	}
 }
 
@@ -401,7 +408,7 @@ repeat_tick(void)
 	    REPEAT_INITIAL_MS : REPEAT_RATE_MS;
 	if (since_fire < need)
 		return;
-	dispatch(held_ks, 0);
+	dispatch(held_ks, held_state);
 	last_fire = now;
 }
 
